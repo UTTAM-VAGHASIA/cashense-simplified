@@ -24,7 +24,7 @@
   - Implement basic grid container for cashbook cards with responsive layout
   - _Requirements: 1.1, 5.5_
 
-- [ ] 3. Create cashbook card components
+- [x] 3. Create cashbook card components
 - [x] 3.1 Implement CreateCashbookCard component
 
 
