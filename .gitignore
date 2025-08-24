@@ -210,4 +210,4 @@ __marimo__/
 venv/
 .idea/
 .gemini/
-.kiro/
+# .kiro/
