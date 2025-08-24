@@ -42,12 +42,21 @@ class DashboardView(ctk.CTkFrame):
         self.cashbook_manager = cashbook_manager
         self.parent = parent
         
+        # Initialize responsive design attributes
+        self.current_layout_mode = "desktop"
+        self.cards_per_row = 2
+        self.see_all_button = None
+        self.see_all_frame = None
+        
         # Configure grid weights for responsive layout
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)  # Main content area expands
         
         self.setup_layout()
         self.refresh_cashbooks()
+        
+        # Bind to configure events for responsive design
+        self.bind("<Configure>", self._on_frame_configure)
     
     def setup_layout(self):
         """Set up the main layout structure of the dashboard."""
@@ -101,13 +110,15 @@ class DashboardView(ctk.CTkFrame):
         self.grid_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
         self.grid_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=20)
         
-        # Configure grid for 2x2 layout (responsive)
-        self.grid_frame.grid_columnconfigure(0, weight=1, minsize=200)
-        self.grid_frame.grid_columnconfigure(1, weight=1, minsize=200)
+        # Configure responsive grid layout
+        self.configure_grid_layout()
         
-        # Add some spacing between grid items
-        self.grid_frame.grid_rowconfigure(0, pad=10)
-        self.grid_frame.grid_rowconfigure(1, pad=10)
+        # Track current layout mode for responsive design
+        self.current_layout_mode = "desktop"  # desktop, tablet, mobile
+        self.cards_per_row = 2  # Default for desktop
+        
+        # Store reference to see all button for dynamic updates
+        self.see_all_button = None
     
     def create_footer_section(self):
         """Create the footer section for status and additional actions."""
@@ -133,8 +144,27 @@ class DashboardView(ctk.CTkFrame):
         for widget in self.grid_frame.winfo_children():
             widget.destroy()
         
-        # Get recent cashbooks (up to 4 for the grid)
-        recent_cashbooks = self.cashbook_manager.get_recent_cashbooks(limit=4)
+        # Clear see all button if it exists
+        if hasattr(self, 'see_all_button') and self.see_all_button:
+            try:
+                self.see_all_button.destroy()
+            except:
+                pass
+            self.see_all_button = None
+        
+        if hasattr(self, 'see_all_frame') and self.see_all_frame:
+            try:
+                self.see_all_frame.destroy()
+            except:
+                pass
+            self.see_all_frame = None
+        
+        # Reconfigure grid layout for current window size
+        self.configure_grid_layout()
+        
+        # Get recent cashbooks based on current layout capacity
+        max_visible = self.calculate_max_visible_cashbooks() - 1  # -1 for create card
+        recent_cashbooks = self.cashbook_manager.get_recent_cashbooks(limit=max_visible)
         
         if not recent_cashbooks:
             # Show empty state
@@ -181,41 +211,69 @@ class DashboardView(ctk.CTkFrame):
     
     def display_cashbooks_grid(self, cashbooks):
         """
-        Display cashbooks in a 2x2 grid layout.
+        Display cashbooks in a responsive grid layout.
         
         Args:
             cashbooks: List of Cashbook objects to display
         """
+        # Calculate how many cashbooks to show based on layout
+        # Always reserve one slot for the create card
+        max_visible_cashbooks = self.calculate_max_visible_cashbooks()
+        
         # Always add the create new cashbook card first
         create_card = CreateCashbookCard(
             self.grid_frame,
             on_create_callback=self.handle_cashbook_creation
         )
-        create_card.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        create_card.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=(10, 5))
         
-        # Add existing cashbook cards (up to 3 more to make 4 total with create card)
-        for i, cashbook in enumerate(cashbooks[:3]):  # Limit to 3 for 2x2 grid with create card
+        # Add existing cashbook cards
+        visible_cashbooks = cashbooks[:max_visible_cashbooks - 1]  # -1 for create card
+        
+        for i, cashbook in enumerate(visible_cashbooks):
             # Calculate position (create card takes 0,0)
-            if i == 0:
-                row, col = 0, 1
-            elif i == 1:
-                row, col = 1, 0
-            else:  # i == 2
-                row, col = 1, 1
+            position = i + 1  # Offset by 1 for create card
+            row = position // self.cards_per_row
+            col = position % self.cards_per_row
             
-            # Create cashbook card
+            # Create cashbook card with responsive padding
             card = CashbookCard(
                 self.grid_frame,
                 cashbook_data=cashbook,
                 on_click_callback=self.handle_cashbook_click,
                 on_context_menu_callback=self.handle_cashbook_context_menu
             )
-            card.grid(row=row, column=col, sticky="nsew", padx=10, pady=10)
+            
+            # Calculate padding based on position
+            padx = (5, 10) if col == self.cards_per_row - 1 else (5, 5)
+            pady = (5, 10) if row > 0 else (10, 5)
+            
+            card.grid(row=row, column=col, sticky="nsew", padx=padx, pady=pady)
         
-        # Add "See all" link if there are more than 3 cashbooks (since create card takes one slot)
+        # Add "See all" functionality if there are more cashbooks
         total_cashbooks = self.cashbook_manager.get_metadata().total_cashbooks
-        if total_cashbooks > 3:
+        if total_cashbooks > max_visible_cashbooks - 1:  # -1 for create card
             self.add_see_all_link(total_cashbooks)
+    
+    def calculate_max_visible_cashbooks(self):
+        """
+        Calculate maximum number of cashbooks to show based on current layout.
+        
+        Returns:
+            int: Maximum number of cashbook cards (including create card)
+        """
+        if self.current_layout_mode == "mobile":
+            return 3  # 1 create + 2 cashbooks in mobile
+        elif self.current_layout_mode == "tablet":
+            if self.cards_per_row == 1:
+                return 4  # 1 create + 3 cashbooks in single column
+            else:
+                return 4  # 1 create + 3 cashbooks in 2x2 grid
+        else:  # desktop
+            if self.cards_per_row == 2:
+                return 4  # 1 create + 3 cashbooks in 2x2 grid
+            else:  # 3 columns
+                return 6  # 1 create + 5 cashbooks in 2x3 grid
     
     def handle_cashbook_click(self, cashbook_id: str):
         """
@@ -276,30 +334,255 @@ class DashboardView(ctk.CTkFrame):
     
     def add_see_all_link(self, total_count):
         """
-        Add a "See all" link when there are more than 4 cashbooks.
+        Add a "See all" link when there are more cashbooks than can be displayed.
         
         Args:
             total_count: Total number of cashbooks
         """
-        see_all_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
-        see_all_frame.grid(row=1, column=0, columnspan=2, pady=20)
+        # Remove existing see all button if it exists
+        if self.see_all_button:
+            self.see_all_button.destroy()
         
-        see_all_button = ctk.CTkButton(
+        # Create see all frame
+        see_all_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
+        see_all_frame.grid(row=1, column=0, columnspan=self.cards_per_row, pady=20)
+        
+        # Create see all button with dynamic text
+        max_visible = self.calculate_max_visible_cashbooks() - 1  # -1 for create card
+        remaining_count = total_count - max_visible
+        
+        self.see_all_button = ctk.CTkButton(
             see_all_frame,
-            text=f"See all {total_count} cashbooks",
+            text=f"See all {total_count} cashbooks (+{remaining_count} more)",
             command=self.show_all_cashbooks,
             fg_color="transparent",
             text_color=("blue", "lightblue"),
             hover_color=("gray90", "gray20"),
-            font=ctk.CTkFont(size=14)
+            font=ctk.CTkFont(size=14),
+            height=40
         )
-        see_all_button.pack()
+        self.see_all_button.pack()
+        
+        # Store reference to frame for cleanup
+        self.see_all_frame = see_all_frame
+    
+    def _on_frame_configure(self, event=None):
+        """Handle frame configuration changes for responsive design."""
+        # Only handle if this is the main frame being configured
+        if event and event.widget == self:
+            # Small delay to avoid excessive recalculations
+            self.after_idle(self.configure_grid_layout)
+    
+    def position_see_all_button(self):
+        """Reposition the see all button based on current layout."""
+        if hasattr(self, 'see_all_frame') and self.see_all_frame.winfo_exists():
+            self.see_all_frame.grid_configure(columnspan=self.cards_per_row)
     
     def show_all_cashbooks(self):
-        """Handle showing all cashbooks (placeholder for future implementation)."""
-        # This will be implemented in a future task
-        print("Show all cashbooks - feature coming soon!")
+        """Handle showing all cashbooks in an expanded view."""
+        # Create a new window or dialog to show all cashbooks
+        self.create_all_cashbooks_window()
     
+    def create_all_cashbooks_window(self):
+        """Create a window to display all cashbooks in a scrollable grid."""
+        # Create new window
+        all_cashbooks_window = ctk.CTkToplevel(self)
+        all_cashbooks_window.title("All Cashbooks")
+        all_cashbooks_window.geometry("900x700")
+        all_cashbooks_window.minsize(600, 400)
+        
+        # Configure window grid
+        all_cashbooks_window.grid_columnconfigure(0, weight=1)
+        all_cashbooks_window.grid_rowconfigure(1, weight=1)
+        
+        # Header
+        header_frame = ctk.CTkFrame(all_cashbooks_window, height=60, corner_radius=0)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_propagate(False)
+        
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="All Cashbooks",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        title_label.grid(row=0, column=0, sticky="w", padx=20, pady=15)
+        
+        # Close button
+        close_button = ctk.CTkButton(
+            header_frame,
+            text="Close",
+            command=all_cashbooks_window.destroy,
+            width=80,
+            height=30
+        )
+        close_button.grid(row=0, column=1, sticky="e", padx=20, pady=15)
+        
+        # Scrollable content area
+        scrollable_frame = ctk.CTkScrollableFrame(all_cashbooks_window)
+        scrollable_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+        
+        # Configure grid for all cashbooks
+        self.populate_all_cashbooks_grid(scrollable_frame, all_cashbooks_window)
+        
+        # Center the window
+        all_cashbooks_window.transient(self.winfo_toplevel())
+        all_cashbooks_window.grab_set()
+        
+        # Focus on the new window
+        all_cashbooks_window.focus()
+    
+    def populate_all_cashbooks_grid(self, parent_frame, window):
+        """
+        Populate the all cashbooks window with a grid of all cashbooks.
+        
+        Args:
+            parent_frame: Parent frame to contain the grid
+            window: Reference to the window for sizing calculations
+        """
+        # Get all cashbooks
+        all_cashbooks = self.cashbook_manager.get_all_cashbooks()
+        
+        # Calculate grid layout for the window
+        window_width = 900  # Default window width
+        cards_per_row = max(2, min(4, window_width // 250))  # 2-4 cards per row
+        
+        # Configure grid columns
+        for i in range(cards_per_row):
+            parent_frame.grid_columnconfigure(i, weight=1, minsize=200)
+        
+        # Add create new cashbook card first
+        create_card = CreateCashbookCard(
+            parent_frame,
+            on_create_callback=lambda name, desc, cat: self.handle_all_cashbooks_creation(
+                name, desc, cat, window
+            )
+        )
+        create_card.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # Add all existing cashbook cards
+        for i, cashbook in enumerate(all_cashbooks):
+            position = i + 1  # Offset by 1 for create card
+            row = position // cards_per_row
+            col = position % cards_per_row
+            
+            card = CashbookCard(
+                parent_frame,
+                cashbook_data=cashbook,
+                on_click_callback=lambda cb_id: self.handle_all_cashbooks_click(cb_id, window),
+                on_context_menu_callback=lambda cb_id, x, y: self.handle_all_cashbooks_context_menu(
+                    cb_id, x, y, window
+                )
+            )
+            card.grid(row=row, column=col, sticky="nsew", padx=10, pady=10)
+        
+        # Add summary info
+        summary_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        summary_frame.grid(
+            row=(len(all_cashbooks) // cards_per_row) + 2, 
+            column=0, 
+            columnspan=cards_per_row, 
+            pady=20
+        )
+        
+        total_entries = sum(cb.entry_count for cb in all_cashbooks)
+        total_amount = sum(cb.total_amount for cb in all_cashbooks)
+        
+        summary_label = ctk.CTkLabel(
+            summary_frame,
+            text=f"Total: {len(all_cashbooks)} cashbooks • {total_entries} entries • ${total_amount:.2f}",
+            font=ctk.CTkFont(size=14),
+            text_color=("gray60", "gray40")
+        )
+        summary_label.pack()
+    
+    def handle_all_cashbooks_creation(self, name: str, description: str, category: str, window):
+        """Handle cashbook creation from the all cashbooks window."""
+        self.handle_cashbook_creation(name, description, category)
+        # Refresh the all cashbooks window
+        window.destroy()
+        self.show_all_cashbooks()
+    
+    def handle_all_cashbooks_click(self, cashbook_id: str, window):
+        """Handle cashbook click from the all cashbooks window."""
+        self.handle_cashbook_click(cashbook_id)
+        window.destroy()  # Close the all cashbooks window
+    
+    def handle_all_cashbooks_context_menu(self, cashbook_id: str, x: int, y: int, window):
+        """Handle context menu from the all cashbooks window."""
+        # Use the same context menu handler but refresh the all cashbooks window after actions
+        original_refresh = self.refresh_cashbooks
+        
+        def refresh_wrapper():
+            original_refresh()
+            # Refresh the all cashbooks window content
+            for widget in window.winfo_children():
+                if isinstance(widget, ctk.CTkScrollableFrame):
+                    for child in widget.winfo_children():
+                        child.destroy()
+                    self.populate_all_cashbooks_grid(widget, window)
+                    break
+        
+        # Temporarily replace refresh method
+        self.refresh_cashbooks = refresh_wrapper
+        
+        try:
+            self.handle_cashbook_context_menu(cashbook_id, x, y)
+        finally:
+            # Restore original refresh method
+            self.refresh_cashbooks = original_refresh
+    
+    def configure_grid_layout(self):
+        """Configure the grid layout based on current window size."""
+        # Get current window width
+        try:
+            window_width = self.winfo_width()
+            if window_width <= 1:  # Window not yet rendered
+                window_width = 800  # Default width
+        except:
+            window_width = 800
+        
+        # Determine layout mode and cards per row
+        if window_width < 500:
+            # Mobile layout: 1 column
+            layout_mode = "mobile"
+            cards_per_row = 1
+            min_card_width = 280
+        elif window_width < 800:
+            # Tablet layout: 1-2 columns depending on content
+            layout_mode = "tablet"
+            cards_per_row = 1 if window_width < 600 else 2
+            min_card_width = 250
+        else:
+            # Desktop layout: 2-3 columns
+            layout_mode = "desktop"
+            cards_per_row = 2 if window_width < 1000 else 3
+            min_card_width = 200
+        
+        # Update layout if changed
+        if (not hasattr(self, 'current_layout_mode') or 
+            self.current_layout_mode != layout_mode or
+            self.cards_per_row != cards_per_row):
+            
+            self.current_layout_mode = layout_mode
+            self.cards_per_row = cards_per_row
+            
+            # Configure grid columns
+            for i in range(4):  # Clear all columns first
+                self.grid_frame.grid_columnconfigure(i, weight=0, minsize=0)
+            
+            # Configure active columns with proper spacing
+            for i in range(cards_per_row):
+                self.grid_frame.grid_columnconfigure(i, weight=1, minsize=min_card_width, pad=5)
+            
+            # Configure row spacing
+            for i in range(3):  # Up to 3 rows for most layouts
+                self.grid_frame.grid_rowconfigure(i, pad=5)
+            
+            # Refresh layout if we have cashbooks
+            if hasattr(self, 'cashbook_manager'):
+                self.refresh_cashbooks()
+
     def handle_resize(self, event=None):
         """
         Handle window resize events for responsive design.
@@ -307,15 +590,12 @@ class DashboardView(ctk.CTkFrame):
         Args:
             event: Tkinter event object (optional)
         """
-        # Get current window width
-        window_width = self.winfo_width()
+        # Reconfigure grid layout based on new window size
+        self.configure_grid_layout()
         
-        if window_width < 600:
-            # Switch to single column layout for narrow windows
-            self.grid_frame.grid_columnconfigure(1, weight=0, minsize=0)
-        else:
-            # Use two column layout for wider windows
-            self.grid_frame.grid_columnconfigure(1, weight=1, minsize=200)
+        # Update see all button position if it exists
+        if self.see_all_button:
+            self.position_see_all_button()
     
     def handle_cashbook_creation(self, name: str, description: str, category: str):
         """
