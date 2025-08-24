@@ -11,9 +11,11 @@ from typing import Optional, Callable
 try:
     from cashbook_manager import CashbookManager
     from create_cashbook_card import CreateCashbookCard
+    from cashbook_card import CashbookCard
 except ImportError:
     from .cashbook_manager import CashbookManager
     from .create_cashbook_card import CreateCashbookCard
+    from .cashbook_card import CashbookCard
 
 
 class DashboardView(ctk.CTkFrame):
@@ -201,8 +203,13 @@ class DashboardView(ctk.CTkFrame):
             else:  # i == 2
                 row, col = 1, 1
             
-            # Create placeholder card
-            card = self.create_placeholder_cashbook_card(cashbook)
+            # Create cashbook card
+            card = CashbookCard(
+                self.grid_frame,
+                cashbook_data=cashbook,
+                on_click_callback=self.handle_cashbook_click,
+                on_context_menu_callback=self.handle_cashbook_context_menu
+            )
             card.grid(row=row, column=col, sticky="nsew", padx=10, pady=10)
         
         # Add "See all" link if there are more than 3 cashbooks (since create card takes one slot)
@@ -210,87 +217,39 @@ class DashboardView(ctk.CTkFrame):
         if total_cashbooks > 3:
             self.add_see_all_link(total_cashbooks)
     
-    def create_placeholder_cashbook_card(self, cashbook):
+    def handle_cashbook_click(self, cashbook_id: str):
         """
-        Create a placeholder cashbook card (temporary implementation).
+        Handle clicking on a cashbook card to open detail view.
         
         Args:
-            cashbook: Cashbook object to display
-            
-        Returns:
-            CTkFrame representing the cashbook card
+            cashbook_id: ID of the clicked cashbook
         """
-        card = ctk.CTkFrame(self.grid_frame, width=250, height=150)
-        card.grid_propagate(False)  # Maintain fixed size
-        
-        # Cashbook name
-        name_label = ctk.CTkLabel(
-            card,
-            text=cashbook.name,
-            font=ctk.CTkFont(size=16, weight="bold"),
-            anchor="w"
-        )
-        name_label.pack(anchor="w", padx=15, pady=(15, 5))
-        
-        # Creation date
-        date_str = cashbook.created_date.strftime("%B %d, %Y")
-        date_label = ctk.CTkLabel(
-            card,
-            text=f"Created: {date_str}",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray60", "gray40"),
-            anchor="w"
-        )
-        date_label.pack(anchor="w", padx=15, pady=2)
-        
-        # Entry count
-        entry_label = ctk.CTkLabel(
-            card,
-            text=f"{cashbook.entry_count} entries",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray60", "gray40"),
-            anchor="w"
-        )
-        entry_label.pack(anchor="w", padx=15, pady=2)
-        
-        # Category (if exists)
-        if cashbook.category:
-            category_label = ctk.CTkLabel(
-                card,
-                text=f"Category: {cashbook.category}",
-                font=ctk.CTkFont(size=11),
-                text_color=("gray50", "gray50"),
-                anchor="w"
-            )
-            category_label.pack(anchor="w", padx=15, pady=(5, 15))
-        
-        # Add hover effect (basic implementation)
-        self.add_hover_effect(card)
-        
-        return card
+        # Placeholder implementation - will be enhanced in future tasks
+        cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
+        if cashbook:
+            print(f"Opening cashbook: {cashbook.name} (ID: {cashbook_id})")
+            self.update_status(f"Opened cashbook '{cashbook.name}' - detail view coming soon!")
+        else:
+            print(f"Cashbook not found: {cashbook_id}")
+            self.update_status("Error: Cashbook not found")
     
-    def add_hover_effect(self, card):
+    def handle_cashbook_context_menu(self, cashbook_id: str, x: int, y: int):
         """
-        Add basic hover effect to a card.
+        Handle right-click context menu on cashbook cards.
         
         Args:
-            card: CTkFrame to add hover effect to
+            cashbook_id: ID of the cashbook
+            x: Screen x coordinate for menu
+            y: Screen y coordinate for menu
         """
-        original_color = card.cget("fg_color")
-        
-        def on_enter(event):
-            card.configure(fg_color=("gray85", "gray25"))
-        
-        def on_leave(event):
-            card.configure(fg_color=original_color)
-        
-        card.bind("<Enter>", on_enter)
-        card.bind("<Leave>", on_leave)
-        
-        # Bind to all child widgets as well
-        for child in card.winfo_children():
-            child.bind("<Enter>", on_enter)
-            child.bind("<Leave>", on_leave)
+        # Placeholder implementation - will be enhanced in future tasks
+        cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
+        if cashbook:
+            print(f"Context menu for cashbook: {cashbook.name} at ({x}, {y})")
+            self.update_status(f"Context menu for '{cashbook.name}' - coming soon!")
+        else:
+            print(f"Cashbook not found for context menu: {cashbook_id}")
+            self.update_status("Error: Cashbook not found")
     
     def add_see_all_link(self, total_count):
         """
