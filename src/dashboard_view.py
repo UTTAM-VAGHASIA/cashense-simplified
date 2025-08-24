@@ -13,11 +13,13 @@ try:
     from create_cashbook_card import CreateCashbookCard
     from cashbook_card import CashbookCard
     from theme_manager import theme, animations, icons
+    from performance_manager import PerformanceOptimizedManager
 except ImportError:
     from .cashbook_manager import CashbookManager, FileOperationError, DataCorruptionError
     from .create_cashbook_card import CreateCashbookCard
     from .cashbook_card import CashbookCard
     from .theme_manager import theme, animations, icons
+    from .performance_manager import PerformanceOptimizedManager
 
 
 class DashboardView(ctk.CTkFrame):
@@ -44,6 +46,9 @@ class DashboardView(ctk.CTkFrame):
         self.cashbook_manager = cashbook_manager
         self.parent = parent
         
+        # Initialize performance optimization
+        self.performance_manager = PerformanceOptimizedManager(cashbook_manager)
+        
         # Initialize responsive design attributes
         self.current_layout_mode = "desktop"
         self.cards_per_row = 2
@@ -59,6 +64,9 @@ class DashboardView(ctk.CTkFrame):
         
         # Bind to configure events for responsive design
         self.bind("<Configure>", self._on_frame_configure)
+        
+        # Optimize for large datasets if needed
+        self.performance_manager.optimize_for_large_dataset()
     
     def setup_layout(self):
         """Set up the main layout structure of the dashboard."""
@@ -150,6 +158,186 @@ class DashboardView(ctk.CTkFrame):
         self.status_label.grid(row=0, column=0, sticky="w", padx=theme.SPACING['lg'], pady=theme.SPACING['md'])
         
         self.footer_frame = footer_frame
+        
+        # Add performance info button (for debugging/monitoring)
+        if hasattr(self, 'performance_manager'):
+            perf_button = ctk.CTkButton(
+                footer_frame,
+                text="📊",
+                command=self.show_performance_info,
+                width=30,
+                height=25,
+                font=theme.create_font('xs')
+            )
+            perf_button.grid(row=0, column=1, sticky="e", padx=theme.SPACING['lg'], pady=theme.SPACING['md'])
+    
+    def show_performance_info(self):
+        """Show performance information dialog."""
+        if not hasattr(self, 'performance_manager'):
+            return
+        
+        # Get performance report
+        report = self.performance_manager.get_performance_report()
+        
+        # Create performance info window
+        perf_window = ctk.CTkToplevel(self)
+        perf_window.title("Performance Information")
+        perf_window.geometry("700x600")
+        perf_window.minsize(600, 500)
+        
+        # Configure window grid
+        perf_window.grid_columnconfigure(0, weight=1)
+        perf_window.grid_rowconfigure(1, weight=1)
+        
+        # Header
+        header_frame = ctk.CTkFrame(perf_window, height=60, corner_radius=0)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_propagate(False)
+        
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="📊 Performance Information",
+            font=ctk.CTkFont(size=18, weight="bold")
+        )
+        title_label.grid(row=0, column=0, sticky="w", padx=20, pady=15)
+        
+        # Close button
+        close_button = ctk.CTkButton(
+            header_frame,
+            text="Close",
+            command=perf_window.destroy,
+            width=80,
+            height=30
+        )
+        close_button.grid(row=0, column=1, sticky="e", padx=20, pady=15)
+        
+        # Scrollable content area
+        scrollable_frame = ctk.CTkScrollableFrame(perf_window)
+        scrollable_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+        
+        # Dataset info
+        dataset_frame = ctk.CTkFrame(scrollable_frame)
+        dataset_frame.pack(fill="x", pady=(0, 15))
+        
+        dataset_title = ctk.CTkLabel(
+            dataset_frame,
+            text="Dataset Information",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        dataset_title.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        dataset_info = report["dataset_info"]
+        dataset_text = (
+            f"Total Cashbooks: {dataset_info['total_cashbooks']}\n"
+            f"Large Dataset: {'Yes' if dataset_info['is_large_dataset'] else 'No'}\n"
+            f"Threshold: {dataset_info['large_dataset_threshold']} cashbooks"
+        )
+        
+        dataset_label = ctk.CTkLabel(
+            dataset_frame,
+            text=dataset_text,
+            font=ctk.CTkFont(size=12),
+            anchor="w",
+            justify="left"
+        )
+        dataset_label.pack(anchor="w", padx=15, pady=(0, 15))
+        
+        # Performance metrics
+        metrics_frame = ctk.CTkFrame(scrollable_frame)
+        metrics_frame.pack(fill="x", pady=(0, 15))
+        
+        metrics_title = ctk.CTkLabel(
+            metrics_frame,
+            text="Performance Metrics",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        metrics_title.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        metrics = report["performance_metrics"]
+        if metrics.get("total_operations", 0) > 0:
+            operations = metrics.get("operations", {})
+            metrics_text = f"Total Operations: {metrics['total_operations']}\n\n"
+            
+            for op_name, op_stats in operations.items():
+                metrics_text += (
+                    f"{op_name}:\n"
+                    f"  Count: {op_stats['count']}\n"
+                    f"  Avg: {op_stats['avg_duration_ms']:.1f}ms\n"
+                    f"  Min: {op_stats['min_duration_ms']:.1f}ms\n"
+                    f"  Max: {op_stats['max_duration_ms']:.1f}ms\n\n"
+                )
+        else:
+            metrics_text = "No performance data available yet.\nPerform some operations to see metrics."
+        
+        metrics_label = ctk.CTkLabel(
+            metrics_frame,
+            text=metrics_text,
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+            justify="left"
+        )
+        metrics_label.pack(anchor="w", padx=15, pady=(0, 15))
+        
+        # Cache performance
+        cache_frame = ctk.CTkFrame(scrollable_frame)
+        cache_frame.pack(fill="x", pady=(0, 15))
+        
+        cache_title = ctk.CTkLabel(
+            cache_frame,
+            text="Cache Performance",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        cache_title.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        cache_stats = report["cache_performance"]
+        cache_text = (
+            f"Total Entries: {cache_stats['total_entries']}\n"
+            f"Valid Entries: {cache_stats['valid_entries']}\n"
+            f"Hit Ratio: {cache_stats['cache_hit_ratio']:.1%}\n"
+            f"TTL: {cache_stats['cache_ttl_minutes']:.1f} minutes"
+        )
+        
+        cache_label = ctk.CTkLabel(
+            cache_frame,
+            text=cache_text,
+            font=ctk.CTkFont(size=12),
+            anchor="w",
+            justify="left"
+        )
+        cache_label.pack(anchor="w", padx=15, pady=(0, 15))
+        
+        # Recommendations
+        recommendations_frame = ctk.CTkFrame(scrollable_frame)
+        recommendations_frame.pack(fill="x", pady=(0, 15))
+        
+        rec_title = ctk.CTkLabel(
+            recommendations_frame,
+            text="Recommendations",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        rec_title.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        recommendations = report["recommendations"]
+        rec_text = "\n".join(f"• {rec}" for rec in recommendations)
+        
+        rec_label = ctk.CTkLabel(
+            recommendations_frame,
+            text=rec_text,
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+            justify="left"
+        )
+        rec_label.pack(anchor="w", padx=15, pady=(0, 15))
+        
+        # Center the window
+        perf_window.transient(self.winfo_toplevel())
+        perf_window.grab_set()
+        perf_window.focus()
     
     def refresh_cashbooks(self):
         """Refresh the display of cashbooks in the grid with error handling."""
@@ -180,7 +368,8 @@ class DashboardView(ctk.CTkFrame):
             max_visible = self.calculate_max_visible_cashbooks() - 1  # -1 for create card
             
             try:
-                recent_cashbooks = self.cashbook_manager.get_recent_cashbooks(limit=max_visible)
+                # Use performance-optimized method for getting recent cashbooks
+                recent_cashbooks = self.performance_manager.get_recent_cashbooks_optimized(limit=max_visible)
             except Exception as e:
                 # Handle data loading errors
                 self.show_data_error(str(e))
