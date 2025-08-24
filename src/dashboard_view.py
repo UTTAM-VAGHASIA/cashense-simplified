@@ -242,14 +242,37 @@ class DashboardView(ctk.CTkFrame):
             x: Screen x coordinate for menu
             y: Screen y coordinate for menu
         """
-        # Placeholder implementation - will be enhanced in future tasks
         cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
-        if cashbook:
-            print(f"Context menu for cashbook: {cashbook.name} at ({x}, {y})")
-            self.update_status(f"Context menu for '{cashbook.name}' - coming soon!")
-        else:
-            print(f"Cashbook not found for context menu: {cashbook_id}")
+        if not cashbook:
             self.update_status("Error: Cashbook not found")
+            return
+        
+        # Create context menu using CTkMessagebox
+        try:
+            from CTkMessagebox import CTkMessagebox
+            
+            # Show context menu with rename and delete options
+            msg = CTkMessagebox(
+                title=f"Manage '{cashbook.name}'",
+                message="Choose an action:",
+                icon="question",
+                option_1="Cancel",
+                option_2="Rename",
+                option_3="Delete"
+            )
+            
+            response = msg.get()
+            
+            if response == "Rename":
+                self.handle_cashbook_rename(cashbook_id)
+            elif response == "Delete":
+                self.handle_cashbook_delete(cashbook_id)
+            # Cancel or close does nothing
+                
+        except ImportError:
+            # Fallback to simple print if CTkMessagebox not available
+            print(f"Context menu for cashbook: {cashbook.name} at ({x}, {y})")
+            self.update_status(f"Context menu for '{cashbook.name}' - CTkMessagebox not available")
     
     def add_see_all_link(self, total_count):
         """
@@ -324,6 +347,147 @@ class DashboardView(ctk.CTkFrame):
                 "Error Creating Cashbook",
                 f"Failed to create cashbook: {str(e)}"
             )
+    
+    def handle_cashbook_rename(self, cashbook_id: str):
+        """
+        Handle renaming a cashbook with inline input dialog.
+        
+        Args:
+            cashbook_id: ID of the cashbook to rename
+        """
+        cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
+        if not cashbook:
+            self.update_status("Error: Cashbook not found")
+            return
+        
+        try:
+            from CTkMessagebox import CTkMessagebox
+            import customtkinter as ctk
+            
+            # Create a custom input dialog for renaming
+            dialog = ctk.CTkInputDialog(
+                text=f"Enter new name for '{cashbook.name}':",
+                title="Rename Cashbook"
+            )
+            
+            new_name = dialog.get_input()
+            
+            if new_name and new_name.strip():
+                new_name = new_name.strip()
+                
+                # Validate the new name
+                if len(new_name) < 1:
+                    CTkMessagebox(
+                        title="Invalid Name",
+                        message="Cashbook name cannot be empty.",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+                    return
+                
+                if len(new_name) > 50:
+                    CTkMessagebox(
+                        title="Invalid Name",
+                        message="Cashbook name cannot exceed 50 characters.",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+                    return
+                
+                # Check if name already exists
+                existing_cashbooks = self.cashbook_manager.get_all_cashbooks()
+                if any(cb.name.lower() == new_name.lower() and cb.id != cashbook_id 
+                       for cb in existing_cashbooks):
+                    CTkMessagebox(
+                        title="Name Already Exists",
+                        message=f"A cashbook named '{new_name}' already exists.",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+                    return
+                
+                # Update the cashbook name
+                try:
+                    self.cashbook_manager.update_cashbook(cashbook_id, name=new_name)
+                    self.refresh_cashbooks()
+                    self.update_status(f"Renamed cashbook to '{new_name}'")
+                    
+                    # Show success message
+                    CTkMessagebox(
+                        title="Success",
+                        message=f"Cashbook renamed to '{new_name}' successfully!",
+                        icon="check",
+                        option_1="OK"
+                    )
+                    
+                except Exception as e:
+                    CTkMessagebox(
+                        title="Error",
+                        message=f"Failed to rename cashbook: {str(e)}",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+            
+        except ImportError:
+            # Fallback if CTkMessagebox not available
+            self.update_status("Rename feature requires CTkMessagebox")
+    
+    def handle_cashbook_delete(self, cashbook_id: str):
+        """
+        Handle deleting a cashbook with confirmation dialog.
+        
+        Args:
+            cashbook_id: ID of the cashbook to delete
+        """
+        cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
+        if not cashbook:
+            self.update_status("Error: Cashbook not found")
+            return
+        
+        try:
+            from CTkMessagebox import CTkMessagebox
+            
+            # Show confirmation dialog
+            msg = CTkMessagebox(
+                title="Delete Cashbook",
+                message=f"Are you sure you want to delete '{cashbook.name}'?\n\n"
+                       f"This action cannot be undone and will permanently remove:\n"
+                       f"• {cashbook.entry_count} entries\n"
+                       f"• All transaction data\n"
+                       f"• Associated metadata",
+                icon="warning",
+                option_1="Cancel",
+                option_2="Delete"
+            )
+            
+            response = msg.get()
+            
+            if response == "Delete":
+                try:
+                    # Delete the cashbook
+                    self.cashbook_manager.delete_cashbook(cashbook_id)
+                    self.refresh_cashbooks()
+                    self.update_status(f"Deleted cashbook '{cashbook.name}'")
+                    
+                    # Show success message
+                    CTkMessagebox(
+                        title="Deleted",
+                        message=f"Cashbook '{cashbook.name}' has been deleted successfully.",
+                        icon="check",
+                        option_1="OK"
+                    )
+                    
+                except Exception as e:
+                    CTkMessagebox(
+                        title="Error",
+                        message=f"Failed to delete cashbook: {str(e)}",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+            
+        except ImportError:
+            # Fallback if CTkMessagebox not available
+            self.update_status("Delete feature requires CTkMessagebox")
     
     def update_status(self, message: str):
         """

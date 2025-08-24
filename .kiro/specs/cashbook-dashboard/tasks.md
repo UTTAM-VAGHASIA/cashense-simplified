@@ -49,7 +49,12 @@
   - Implement click handler to open cashbook detail view (placeholder for now)
   - _Requirements: 1.2, 1.3, 3.1, 3.2_
 
-- [ ] 3.3 Add context menu functionality to cashbook cards
+- [x] 3.3 Add context menu functionality to cashbook cards
+
+
+
+
+
   - Fetch latest documentation from context7 for CustomTkinter context menus and input dialogs
   - Implement right-click context menu with rename and delete options
   - Add confirmation dialog for delete operations with proper error handling
