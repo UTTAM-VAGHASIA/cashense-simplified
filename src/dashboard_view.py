@@ -10,8 +10,10 @@ import customtkinter as ctk
 from typing import Optional, Callable
 try:
     from cashbook_manager import CashbookManager
+    from create_cashbook_card import CreateCashbookCard
 except ImportError:
     from .cashbook_manager import CashbookManager
+    from .create_cashbook_card import CreateCashbookCard
 
 
 class DashboardView(ctk.CTkFrame):
@@ -141,8 +143,16 @@ class DashboardView(ctk.CTkFrame):
     
     def show_empty_state(self):
         """Display empty state when no cashbooks exist."""
-        empty_frame = ctk.CTkFrame(self.grid_frame)
-        empty_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=40)
+        # Add the create new cashbook card
+        create_card = CreateCashbookCard(
+            self.grid_frame,
+            on_create_callback=self.handle_cashbook_creation
+        )
+        create_card.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # Add empty state message in the remaining space
+        empty_frame = ctk.CTkFrame(self.grid_frame, fg_color="transparent")
+        empty_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=20, pady=40)
         
         # Empty state icon and message
         empty_icon = ctk.CTkLabel(
@@ -174,18 +184,30 @@ class DashboardView(ctk.CTkFrame):
         Args:
             cashbooks: List of Cashbook objects to display
         """
-        # Create placeholder cards for now (will be replaced with actual cards in next tasks)
-        for i, cashbook in enumerate(cashbooks[:4]):  # Limit to 4 for 2x2 grid
-            row = i // 2
-            col = i % 2
+        # Always add the create new cashbook card first
+        create_card = CreateCashbookCard(
+            self.grid_frame,
+            on_create_callback=self.handle_cashbook_creation
+        )
+        create_card.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # Add existing cashbook cards (up to 3 more to make 4 total with create card)
+        for i, cashbook in enumerate(cashbooks[:3]):  # Limit to 3 for 2x2 grid with create card
+            # Calculate position (create card takes 0,0)
+            if i == 0:
+                row, col = 0, 1
+            elif i == 1:
+                row, col = 1, 0
+            else:  # i == 2
+                row, col = 1, 1
             
             # Create placeholder card
             card = self.create_placeholder_cashbook_card(cashbook)
             card.grid(row=row, column=col, sticky="nsew", padx=10, pady=10)
         
-        # Add "See all" link if there are more than 4 cashbooks
+        # Add "See all" link if there are more than 3 cashbooks (since create card takes one slot)
         total_cashbooks = self.cashbook_manager.get_metadata().total_cashbooks
-        if total_cashbooks > 4:
+        if total_cashbooks > 3:
             self.add_see_all_link(total_cashbooks)
     
     def create_placeholder_cashbook_card(self, cashbook):
@@ -312,6 +334,37 @@ class DashboardView(ctk.CTkFrame):
         else:
             # Use two column layout for wider windows
             self.grid_frame.grid_columnconfigure(1, weight=1, minsize=200)
+    
+    def handle_cashbook_creation(self, name: str, description: str, category: str):
+        """
+        Handle the creation of a new cashbook.
+        
+        Args:
+            name: Name of the new cashbook
+            description: Optional description
+            category: Optional category
+        """
+        try:
+            # Create the cashbook using the manager
+            cashbook = self.cashbook_manager.create_cashbook(
+                name=name,
+                description=description,
+                category=category
+            )
+            
+            # Refresh the dashboard to show the new cashbook
+            self.refresh_cashbooks()
+            
+            # Update status
+            self.update_status(f"Created cashbook '{name}' successfully")
+            
+        except Exception as e:
+            # Show error message
+            from tkinter import messagebox
+            messagebox.showerror(
+                "Error Creating Cashbook",
+                f"Failed to create cashbook: {str(e)}"
+            )
     
     def update_status(self, message: str):
         """

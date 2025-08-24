@@ -25,7 +25,12 @@
   - _Requirements: 1.1, 5.5_
 
 - [ ] 3. Create cashbook card components
-- [ ] 3.1 Implement CreateCashbookCard component
+- [x] 3.1 Implement CreateCashbookCard component
+
+
+
+
+
   - Fetch latest documentation from context7 for CustomTkinter buttons and dialogs
   - Build the "Create new cashbook" card with + icon and styling
   - Implement click handler that opens cashbook creation dialog
