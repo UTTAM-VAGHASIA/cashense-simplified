@@ -121,7 +121,12 @@
   - Create integration tests for complete dashboard workflows
   - _Requirements: 5.3_
 
-- [ ] 9. Wire dashboard navigation to future cashbook detail views
+- [x] 9. Wire dashboard navigation to future cashbook detail views
+
+
+
+
+
   - Fetch latest documentation from context7 for CustomTkinter navigation patterns and view management
   - Create placeholder cashbook detail view that can be opened from cards
   - Implement navigation system between dashboard and detail views

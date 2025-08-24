@@ -56,6 +56,20 @@ python src/main.py
 
 The application will launch a modern GUI interface with dark theme support.
 
+#### Navigation Features
+
+The application now includes a complete navigation system:
+
+- **Dashboard View**: Main landing screen showing recent cashbooks in a card-based layout
+- **Cashbook Detail View**: Detailed view for individual cashbooks with expense entries
+- **Breadcrumb Navigation**: Easy navigation back to dashboard with breadcrumb trail
+- **Responsive Design**: Adapts to different window sizes and screen resolutions
+
+**Navigation Usage:**
+1. Click on any cashbook card in the dashboard to open its detail view
+2. Use the "← Dashboard" button or breadcrumb navigation to return to the main dashboard
+3. Window title updates to reflect the current view and selected cashbook
+
 ### Running Tests
 
 To run the tests, use `pytest`:

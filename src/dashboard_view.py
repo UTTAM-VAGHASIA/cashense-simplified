@@ -32,19 +32,21 @@ class DashboardView(ctk.CTkFrame):
     - Integration with CashbookManager for data operations
     """
     
-    def __init__(self, parent, cashbook_manager: CashbookManager, **kwargs):
+    def __init__(self, parent, cashbook_manager: CashbookManager, on_cashbook_click: Optional[Callable[[str], None]] = None, **kwargs):
         """
         Initialize the dashboard view.
         
         Args:
             parent: Parent widget (typically the main window)
             cashbook_manager: CashbookManager instance for data operations
+            on_cashbook_click: Optional callback for when a cashbook is clicked
             **kwargs: Additional arguments passed to CTkFrame
         """
         super().__init__(parent, **kwargs)
         
         self.cashbook_manager = cashbook_manager
         self.parent = parent
+        self.on_cashbook_click = on_cashbook_click
         
         # Initialize performance optimization
         self.performance_manager = PerformanceOptimizedManager(cashbook_manager)
@@ -611,14 +613,18 @@ class DashboardView(ctk.CTkFrame):
         Args:
             cashbook_id: ID of the clicked cashbook
         """
-        # Placeholder implementation - will be enhanced in future tasks
-        cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
-        if cashbook:
-            print(f"Opening cashbook: {cashbook.name} (ID: {cashbook_id})")
-            self.update_status(f"📖 Opened cashbook '{cashbook.name}' - detail view coming soon!")
+        # Use the navigation callback if provided, otherwise use default behavior
+        if self.on_cashbook_click:
+            self.on_cashbook_click(cashbook_id)
         else:
-            print(f"Cashbook not found: {cashbook_id}")
-            self.update_status("❌ Error: Cashbook not found")
+            # Fallback behavior for standalone usage
+            cashbook = self.cashbook_manager.get_cashbook(cashbook_id)
+            if cashbook:
+                print(f"Opening cashbook: {cashbook.name} (ID: {cashbook_id})")
+                self.update_status(f"📖 Opened cashbook '{cashbook.name}' - detail view coming soon!")
+            else:
+                print(f"Cashbook not found: {cashbook_id}")
+                self.update_status("❌ Error: Cashbook not found")
     
     def handle_cashbook_context_menu(self, cashbook_id: str, x: int, y: int):
         """
