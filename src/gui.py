@@ -1,6 +1,12 @@
 import customtkinter as ctk
 from tkinter import messagebox
 import sys
+try:
+    from dashboard_view import DashboardView
+    from cashbook_manager import CashbookManager
+except ImportError:
+    from .dashboard_view import DashboardView
+    from .cashbook_manager import CashbookManager
 
 class CashenseApp:
     def __init__(self):
@@ -14,117 +20,37 @@ class CashenseApp:
         self.root.geometry("800x600")
         self.root.minsize(600, 400)
         
+        # Initialize cashbook manager
+        self.cashbook_manager = CashbookManager()
+        
         self.setup_ui()
     
     def setup_ui(self):
-        # Main title
-        title_label = ctk.CTkLabel(
+        # Configure main window grid
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
+        
+        # Create and display dashboard view
+        self.dashboard_view = DashboardView(
             self.root, 
-            text="💰 Cashense", 
-            font=ctk.CTkFont(size=32, weight="bold")
+            self.cashbook_manager,
+            corner_radius=0
         )
-        title_label.pack(pady=30)
+        self.dashboard_view.grid(row=0, column=0, sticky="nsew")
         
-        # Subtitle
-        subtitle_label = ctk.CTkLabel(
-            self.root, 
-            text="Your Intelligent Finance Companion", 
-            font=ctk.CTkFont(size=16)
-        )
-        subtitle_label.pack(pady=(0, 40))
-        
-        # Main frame for buttons
-        button_frame = ctk.CTkFrame(self.root)
-        button_frame.pack(pady=20, padx=40, fill="both", expand=True)
-        
-        # Welcome message
-        welcome_label = ctk.CTkLabel(
-            button_frame, 
-            text="Welcome to Cashense!\nYour personal finance tracking journey starts here.", 
-            font=ctk.CTkFont(size=14),
-            justify="center"
-        )
-        welcome_label.pack(pady=30)
-        
-        # Action buttons
-        self.create_action_buttons(button_frame)
-        
-        # Status bar
-        self.status_label = ctk.CTkLabel(
-            self.root, 
-            text="Ready", 
-            font=ctk.CTkFont(size=12)
-        )
-        self.status_label.pack(side="bottom", pady=10)
+        # Bind resize event for responsive design
+        self.root.bind("<Configure>", self.on_window_resize)
     
-    def create_action_buttons(self, parent):
-        # Button container
-        button_container = ctk.CTkFrame(parent)
-        button_container.pack(pady=20)
-        
-        # Add Transaction button
-        add_transaction_btn = ctk.CTkButton(
-            button_container,
-            text="📝 Add Transaction",
-            command=self.add_transaction,
-            width=200,
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        add_transaction_btn.pack(pady=10)
-        
-        # View Balance button
-        view_balance_btn = ctk.CTkButton(
-            button_container,
-            text="💳 View Balance",
-            command=self.view_balance,
-            width=200,
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        view_balance_btn.pack(pady=10)
-        
-        # View History button
-        view_history_btn = ctk.CTkButton(
-            button_container,
-            text="📊 Transaction History",
-            command=self.view_history,
-            width=200,
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        view_history_btn.pack(pady=10)
-        
-        # Settings button
-        settings_btn = ctk.CTkButton(
-            button_container,
-            text="⚙️ Settings",
-            command=self.open_settings,
-            width=200,
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        settings_btn.pack(pady=10)
-    
-    def add_transaction(self):
-        self.update_status("Opening Add Transaction...")
-        messagebox.showinfo("Add Transaction", "Add Transaction feature coming soon!")
-    
-    def view_balance(self):
-        self.update_status("Checking balance...")
-        messagebox.showinfo("Balance", "Current Balance: $0.00\n\nBalance tracking feature coming soon!")
-    
-    def view_history(self):
-        self.update_status("Loading transaction history...")
-        messagebox.showinfo("Transaction History", "Transaction history feature coming soon!")
-    
-    def open_settings(self):
-        self.update_status("Opening settings...")
-        messagebox.showinfo("Settings", "Settings panel coming soon!")
+    def on_window_resize(self, event=None):
+        """Handle window resize events for responsive design."""
+        # Only handle resize events for the main window
+        if event and event.widget == self.root:
+            self.dashboard_view.handle_resize(event)
     
     def update_status(self, message):
-        self.status_label.configure(text=message)
-        self.root.after(2000, lambda: self.status_label.configure(text="Ready"))
+        """Update status message in the dashboard."""
+        if hasattr(self, 'dashboard_view'):
+            self.dashboard_view.update_status(message)
     
     def run(self):
         try:

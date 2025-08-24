@@ -1,0 +1,326 @@
+"""
+Dashboard View for the Cashbook Dashboard application.
+
+This module contains the DashboardView class that provides the main
+dashboard interface for managing cashbooks, replacing the simple
+welcome screen with a modern card-based layout.
+"""
+
+import customtkinter as ctk
+from typing import Optional, Callable
+try:
+    from cashbook_manager import CashbookManager
+except ImportError:
+    from .cashbook_manager import CashbookManager
+
+
+class DashboardView(ctk.CTkFrame):
+    """
+    Main dashboard view that displays cashbooks in a card-based layout.
+    
+    This view replaces the current welcome screen and provides:
+    - Header section with "Recent cashbooks" title
+    - Grid container for cashbook cards with responsive layout
+    - Integration with CashbookManager for data operations
+    """
+    
+    def __init__(self, parent, cashbook_manager: CashbookManager, **kwargs):
+        """
+        Initialize the dashboard view.
+        
+        Args:
+            parent: Parent widget (typically the main window)
+            cashbook_manager: CashbookManager instance for data operations
+            **kwargs: Additional arguments passed to CTkFrame
+        """
+        super().__init__(parent, **kwargs)
+        
+        self.cashbook_manager = cashbook_manager
+        self.parent = parent
+        
+        # Configure grid weights for responsive layout
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)  # Main content area expands
+        
+        self.setup_layout()
+        self.refresh_cashbooks()
+    
+    def setup_layout(self):
+        """Set up the main layout structure of the dashboard."""
+        # Header section
+        self.create_header_section()
+        
+        # Main content area (grid container)
+        self.create_main_content_area()
+        
+        # Footer section (for future status/actions)
+        self.create_footer_section()
+    
+    def create_header_section(self):
+        """Create the header section with title and navigation."""
+        header_frame = ctk.CTkFrame(self, height=80, corner_radius=0)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_propagate(False)  # Maintain fixed height
+        
+        # Main title
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="Recent cashbooks",
+            font=ctk.CTkFont(size=24, weight="bold"),
+            anchor="w"
+        )
+        title_label.grid(row=0, column=0, sticky="w", padx=30, pady=25)
+        
+        self.header_frame = header_frame
+    
+    def create_main_content_area(self):
+        """Create the main content area that will contain the cashbook grid."""
+        # Scrollable frame for the grid content
+        self.main_content = ctk.CTkScrollableFrame(
+            self,
+            corner_radius=0,
+            fg_color="transparent"
+        )
+        self.main_content.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        
+        # Configure grid for responsive layout
+        self.main_content.grid_columnconfigure(0, weight=1)
+        self.main_content.grid_columnconfigure(1, weight=1)
+        
+        # Grid container for cashbook cards
+        self.create_cashbook_grid()
+    
+    def create_cashbook_grid(self):
+        """Create the grid container for cashbook cards."""
+        # Grid frame that will contain the cards
+        self.grid_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
+        self.grid_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=20)
+        
+        # Configure grid for 2x2 layout (responsive)
+        self.grid_frame.grid_columnconfigure(0, weight=1, minsize=200)
+        self.grid_frame.grid_columnconfigure(1, weight=1, minsize=200)
+        
+        # Add some spacing between grid items
+        self.grid_frame.grid_rowconfigure(0, pad=10)
+        self.grid_frame.grid_rowconfigure(1, pad=10)
+    
+    def create_footer_section(self):
+        """Create the footer section for status and additional actions."""
+        footer_frame = ctk.CTkFrame(self, height=40, corner_radius=0)
+        footer_frame.grid(row=2, column=0, sticky="ew", padx=0, pady=0)
+        footer_frame.grid_columnconfigure(0, weight=1)
+        footer_frame.grid_propagate(False)  # Maintain fixed height
+        
+        # Status label (placeholder for now)
+        self.status_label = ctk.CTkLabel(
+            footer_frame,
+            text="Ready",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray60", "gray40")
+        )
+        self.status_label.grid(row=0, column=0, sticky="w", padx=20, pady=10)
+        
+        self.footer_frame = footer_frame
+    
+    def refresh_cashbooks(self):
+        """Refresh the display of cashbooks in the grid."""
+        # Clear existing grid content
+        for widget in self.grid_frame.winfo_children():
+            widget.destroy()
+        
+        # Get recent cashbooks (up to 4 for the grid)
+        recent_cashbooks = self.cashbook_manager.get_recent_cashbooks(limit=4)
+        
+        if not recent_cashbooks:
+            # Show empty state
+            self.show_empty_state()
+        else:
+            # Display cashbooks in grid
+            self.display_cashbooks_grid(recent_cashbooks)
+    
+    def show_empty_state(self):
+        """Display empty state when no cashbooks exist."""
+        empty_frame = ctk.CTkFrame(self.grid_frame)
+        empty_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=40)
+        
+        # Empty state icon and message
+        empty_icon = ctk.CTkLabel(
+            empty_frame,
+            text="📚",
+            font=ctk.CTkFont(size=48)
+        )
+        empty_icon.pack(pady=(30, 10))
+        
+        empty_title = ctk.CTkLabel(
+            empty_frame,
+            text="No cashbooks yet",
+            font=ctk.CTkFont(size=18, weight="bold")
+        )
+        empty_title.pack(pady=(0, 5))
+        
+        empty_subtitle = ctk.CTkLabel(
+            empty_frame,
+            text="Create your first cashbook to start tracking expenses",
+            font=ctk.CTkFont(size=14),
+            text_color=("gray60", "gray40")
+        )
+        empty_subtitle.pack(pady=(0, 30))
+    
+    def display_cashbooks_grid(self, cashbooks):
+        """
+        Display cashbooks in a 2x2 grid layout.
+        
+        Args:
+            cashbooks: List of Cashbook objects to display
+        """
+        # Create placeholder cards for now (will be replaced with actual cards in next tasks)
+        for i, cashbook in enumerate(cashbooks[:4]):  # Limit to 4 for 2x2 grid
+            row = i // 2
+            col = i % 2
+            
+            # Create placeholder card
+            card = self.create_placeholder_cashbook_card(cashbook)
+            card.grid(row=row, column=col, sticky="nsew", padx=10, pady=10)
+        
+        # Add "See all" link if there are more than 4 cashbooks
+        total_cashbooks = self.cashbook_manager.get_metadata().total_cashbooks
+        if total_cashbooks > 4:
+            self.add_see_all_link(total_cashbooks)
+    
+    def create_placeholder_cashbook_card(self, cashbook):
+        """
+        Create a placeholder cashbook card (temporary implementation).
+        
+        Args:
+            cashbook: Cashbook object to display
+            
+        Returns:
+            CTkFrame representing the cashbook card
+        """
+        card = ctk.CTkFrame(self.grid_frame, width=250, height=150)
+        card.grid_propagate(False)  # Maintain fixed size
+        
+        # Cashbook name
+        name_label = ctk.CTkLabel(
+            card,
+            text=cashbook.name,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w"
+        )
+        name_label.pack(anchor="w", padx=15, pady=(15, 5))
+        
+        # Creation date
+        date_str = cashbook.created_date.strftime("%B %d, %Y")
+        date_label = ctk.CTkLabel(
+            card,
+            text=f"Created: {date_str}",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray60", "gray40"),
+            anchor="w"
+        )
+        date_label.pack(anchor="w", padx=15, pady=2)
+        
+        # Entry count
+        entry_label = ctk.CTkLabel(
+            card,
+            text=f"{cashbook.entry_count} entries",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray60", "gray40"),
+            anchor="w"
+        )
+        entry_label.pack(anchor="w", padx=15, pady=2)
+        
+        # Category (if exists)
+        if cashbook.category:
+            category_label = ctk.CTkLabel(
+                card,
+                text=f"Category: {cashbook.category}",
+                font=ctk.CTkFont(size=11),
+                text_color=("gray50", "gray50"),
+                anchor="w"
+            )
+            category_label.pack(anchor="w", padx=15, pady=(5, 15))
+        
+        # Add hover effect (basic implementation)
+        self.add_hover_effect(card)
+        
+        return card
+    
+    def add_hover_effect(self, card):
+        """
+        Add basic hover effect to a card.
+        
+        Args:
+            card: CTkFrame to add hover effect to
+        """
+        original_color = card.cget("fg_color")
+        
+        def on_enter(event):
+            card.configure(fg_color=("gray85", "gray25"))
+        
+        def on_leave(event):
+            card.configure(fg_color=original_color)
+        
+        card.bind("<Enter>", on_enter)
+        card.bind("<Leave>", on_leave)
+        
+        # Bind to all child widgets as well
+        for child in card.winfo_children():
+            child.bind("<Enter>", on_enter)
+            child.bind("<Leave>", on_leave)
+    
+    def add_see_all_link(self, total_count):
+        """
+        Add a "See all" link when there are more than 4 cashbooks.
+        
+        Args:
+            total_count: Total number of cashbooks
+        """
+        see_all_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
+        see_all_frame.grid(row=1, column=0, columnspan=2, pady=20)
+        
+        see_all_button = ctk.CTkButton(
+            see_all_frame,
+            text=f"See all {total_count} cashbooks",
+            command=self.show_all_cashbooks,
+            fg_color="transparent",
+            text_color=("blue", "lightblue"),
+            hover_color=("gray90", "gray20"),
+            font=ctk.CTkFont(size=14)
+        )
+        see_all_button.pack()
+    
+    def show_all_cashbooks(self):
+        """Handle showing all cashbooks (placeholder for future implementation)."""
+        # This will be implemented in a future task
+        print("Show all cashbooks - feature coming soon!")
+    
+    def handle_resize(self, event=None):
+        """
+        Handle window resize events for responsive design.
+        
+        Args:
+            event: Tkinter event object (optional)
+        """
+        # Get current window width
+        window_width = self.winfo_width()
+        
+        if window_width < 600:
+            # Switch to single column layout for narrow windows
+            self.grid_frame.grid_columnconfigure(1, weight=0, minsize=0)
+        else:
+            # Use two column layout for wider windows
+            self.grid_frame.grid_columnconfigure(1, weight=1, minsize=200)
+    
+    def update_status(self, message: str):
+        """
+        Update the status message in the footer.
+        
+        Args:
+            message: Status message to display
+        """
+        self.status_label.configure(text=message)
+        
+        # Auto-clear status after 3 seconds
+        self.after(3000, lambda: self.status_label.configure(text="Ready"))

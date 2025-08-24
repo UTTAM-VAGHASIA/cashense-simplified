@@ -11,7 +11,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from .models import Cashbook, CashbookMetadata, generate_cashbook_id
+try:
+    from models import Cashbook, CashbookMetadata, generate_cashbook_id
+except ImportError:
+    from .models import Cashbook, CashbookMetadata, generate_cashbook_id
 
 
 class CashbookManager:
