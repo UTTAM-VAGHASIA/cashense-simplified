@@ -126,6 +126,32 @@ class TestCreateCashbookCardIntegration(unittest.TestCase):
         recent_after = self.manager.get_recent_cashbooks()
         self.assertEqual(len(recent_after), 1)
         self.assertEqual(recent_after[0].id, cashbook.id)
+    
+    def test_create_cashbook_with_custom_category(self):
+        """Test creating cashbook with custom category."""
+        def create_callback(name, description, category):
+            return self.manager.create_cashbook(
+                name=name,
+                description=description,
+                category=category
+            )
+        
+        # Test creating cashbook with custom category
+        cashbook = create_callback("Custom Category Test", "Test description", "My Custom Category")
+        
+        # Verify cashbook was created with custom category
+        self.assertIsNotNone(cashbook)
+        self.assertEqual(cashbook.name, "Custom Category Test")
+        self.assertEqual(cashbook.category, "My Custom Category")
+        
+        # Verify it appears in recent cashbooks
+        recent = self.manager.get_recent_cashbooks()
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0].category, "My Custom Category")
+        
+        # Verify metadata includes the custom category
+        metadata = self.manager.get_metadata()
+        self.assertIn("My Custom Category", metadata.categories)
 
 
 if __name__ == '__main__':

@@ -95,6 +95,26 @@ class TestCashbookCreationDialog(unittest.TestCase):
         self.assertIsNotNone(self.dialog_class.categories)
         self.assertIn("Personal", self.dialog_class.categories)
         self.assertIn("Business", self.dialog_class.categories)
+        self.assertIn("Other", self.dialog_class.categories)
+    
+    def test_custom_category_field_visibility(self):
+        """Test that custom category field shows/hides correctly."""
+        # Create dialog UI first
+        self.dialog_class.show()
+        
+        # Initially custom category should not be visible
+        self.assertFalse(self.dialog_class.custom_category_widgets_visible)
+        
+        # Select "Other" category
+        self.dialog_class.on_category_change("Other")
+        self.assertTrue(self.dialog_class.custom_category_widgets_visible)
+        
+        # Select different category
+        self.dialog_class.on_category_change("Personal")
+        self.assertFalse(self.dialog_class.custom_category_widgets_visible)
+        
+        # Clean up
+        self.dialog_class.dialog.destroy()
     
     def test_validate_form_empty_name(self):
         """Test form validation with empty name."""
@@ -168,6 +188,61 @@ class TestCashbookCreationDialog(unittest.TestCase):
         
         self.assertTrue(is_valid)
         self.assertEqual(error, "")
+        
+        # Clean up
+        self.dialog_class.dialog.destroy()
+    
+    def test_validate_form_custom_category_valid(self):
+        """Test form validation with valid custom category."""
+        # Create dialog UI first
+        self.dialog_class.show()
+        
+        # Set valid name and select "Other" category
+        self.dialog_class.name_entry.insert(0, "Valid Name")
+        self.dialog_class.category_combo.set("Other")
+        self.dialog_class.custom_category_entry.insert(0, "My Custom Category")
+        
+        is_valid, error = self.dialog_class.validate_form()
+        
+        self.assertTrue(is_valid)
+        self.assertEqual(error, "")
+        
+        # Clean up
+        self.dialog_class.dialog.destroy()
+    
+    def test_validate_form_custom_category_too_long(self):
+        """Test form validation with too long custom category."""
+        # Create dialog UI first
+        self.dialog_class.show()
+        
+        # Set valid name and select "Other" category with long custom category
+        self.dialog_class.name_entry.insert(0, "Valid Name")
+        self.dialog_class.category_combo.set("Other")
+        long_category = "A" * 51
+        self.dialog_class.custom_category_entry.insert(0, long_category)
+        
+        is_valid, error = self.dialog_class.validate_form()
+        
+        self.assertFalse(is_valid)
+        self.assertIn("50 characters", error)
+        
+        # Clean up
+        self.dialog_class.dialog.destroy()
+    
+    def test_validate_form_custom_category_invalid_characters(self):
+        """Test form validation with invalid characters in custom category."""
+        # Create dialog UI first
+        self.dialog_class.show()
+        
+        # Set valid name and select "Other" category with invalid characters
+        self.dialog_class.name_entry.insert(0, "Valid Name")
+        self.dialog_class.category_combo.set("Other")
+        self.dialog_class.custom_category_entry.insert(0, "Invalid@#$%")
+        
+        is_valid, error = self.dialog_class.validate_form()
+        
+        self.assertFalse(is_valid)
+        self.assertIn("invalid characters", error)
         
         # Clean up
         self.dialog_class.dialog.destroy()

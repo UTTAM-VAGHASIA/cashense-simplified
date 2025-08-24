@@ -159,7 +159,7 @@ class CashbookCreationDialog:
         # Create toplevel window
         self.dialog = ctk.CTkToplevel(self.parent)
         self.dialog.title("Create New Cashbook")
-        self.dialog.geometry("400x350")
+        self.dialog.geometry("400x450")  # Increased height to ensure buttons are visible
         self.dialog.resizable(False, False)
         
         # Make dialog modal
@@ -186,7 +186,7 @@ class CashbookCreationDialog:
         
         # Calculate dialog position
         dialog_width = 400
-        dialog_height = 350
+        dialog_height = 450
         x = parent_x + (parent_width - dialog_width) // 2
         y = parent_y + (parent_height - dialog_height) // 2
         
@@ -253,10 +253,29 @@ class CashbookCreationDialog:
             values=self.categories,
             font=ctk.CTkFont(size=12),
             height=35,
-            state="readonly"
+            state="readonly",
+            command=self.on_category_change
         )
         self.category_combo.set("")  # No default selection
-        self.category_combo.grid(row=6, column=0, pady=(0, 20), padx=20, sticky="ew")
+        self.category_combo.grid(row=6, column=0, pady=(0, 15), padx=20, sticky="ew")
+        
+        # Custom category field (initially hidden)
+        self.custom_category_label = ctk.CTkLabel(
+            self.dialog,
+            text="Custom Category",
+            font=ctk.CTkFont(size=14),
+            anchor="w"
+        )
+        
+        self.custom_category_entry = ctk.CTkEntry(
+            self.dialog,
+            placeholder_text="Enter custom category...",
+            font=ctk.CTkFont(size=12),
+            height=35
+        )
+        
+        # Initially hide custom category widgets
+        self.custom_category_widgets_visible = False
         
         # Error label for validation messages
         self.error_label = ctk.CTkLabel(
@@ -266,17 +285,17 @@ class CashbookCreationDialog:
             text_color="red",
             anchor="w"
         )
-        self.error_label.grid(row=7, column=0, pady=(0, 10), padx=20, sticky="ew")
+        self.error_label.grid(row=9, column=0, pady=(0, 10), padx=20, sticky="ew")
         
         # Buttons frame
-        buttons_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
-        buttons_frame.grid(row=8, column=0, pady=(0, 20), padx=20, sticky="ew")
-        buttons_frame.grid_columnconfigure(0, weight=1)
-        buttons_frame.grid_columnconfigure(1, weight=1)
+        self.buttons_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
+        self.buttons_frame.grid(row=10, column=0, pady=(0, 20), padx=20, sticky="ew")
+        self.buttons_frame.grid_columnconfigure(0, weight=1)
+        self.buttons_frame.grid_columnconfigure(1, weight=1)
         
         # Cancel button
-        cancel_button = ctk.CTkButton(
-            buttons_frame,
+        self.cancel_button = ctk.CTkButton(
+            self.buttons_frame,
             text="Cancel",
             command=self.cancel_creation,
             fg_color="transparent",
@@ -286,11 +305,11 @@ class CashbookCreationDialog:
             hover_color=("gray90", "gray20"),
             height=35
         )
-        cancel_button.grid(row=0, column=0, padx=(0, 10), sticky="ew")
+        self.cancel_button.grid(row=0, column=0, padx=(0, 10), sticky="ew")
         
         # Create button
         self.create_button = ctk.CTkButton(
-            buttons_frame,
+            self.buttons_frame,
             text="Create Cashbook",
             command=self.create_cashbook,
             height=35
@@ -300,6 +319,56 @@ class CashbookCreationDialog:
         # Bind Enter key to create button
         self.dialog.bind("<Return>", lambda e: self.create_cashbook())
         self.dialog.bind("<Escape>", lambda e: self.cancel_creation())
+    
+    def on_category_change(self, selected_category):
+        """
+        Handle category selection changes.
+        
+        Args:
+            selected_category: The selected category value
+        """
+        if selected_category == "Other":
+            self.show_custom_category_field()
+        else:
+            self.hide_custom_category_field()
+    
+    def show_custom_category_field(self):
+        """Show the custom category input field."""
+        if not self.custom_category_widgets_visible:
+            # Show the custom category label and entry in separate rows
+            self.custom_category_label.grid(row=7, column=0, pady=(0, 5), padx=20, sticky="ew")
+            self.custom_category_entry.grid(row=8, column=0, pady=(0, 15), padx=20, sticky="ew")
+            
+            # Move error label and buttons down
+            self.error_label.grid(row=9, column=0, pady=(0, 10), padx=20, sticky="ew")
+            self.buttons_frame.grid(row=10, column=0, pady=(0, 20), padx=20, sticky="ew")
+            
+            # Update dialog size to accommodate new field
+            self.dialog.geometry("400x500")
+            
+            self.custom_category_widgets_visible = True
+            
+            # Focus on custom category entry
+            self.custom_category_entry.focus()
+    
+    def hide_custom_category_field(self):
+        """Hide the custom category input field."""
+        if self.custom_category_widgets_visible:
+            # Hide the custom category widgets
+            self.custom_category_label.grid_remove()
+            self.custom_category_entry.grid_remove()
+            
+            # Move error label and buttons back up
+            self.error_label.grid(row=9, column=0, pady=(0, 10), padx=20, sticky="ew")
+            self.buttons_frame.grid(row=10, column=0, pady=(0, 20), padx=20, sticky="ew")
+            
+            # Reset dialog size
+            self.dialog.geometry("400x450")
+            
+            self.custom_category_widgets_visible = False
+            
+            # Clear custom category entry
+            self.custom_category_entry.delete(0, 'end')
     
     def validate_form(self) -> tuple[bool, str]:
         """
@@ -330,6 +399,15 @@ class CashbookCreationDialog:
         if description and len(description) > 200:
             return False, "Description must be less than 200 characters"
         
+        # Check custom category length if "Other" is selected and custom category is provided
+        category = self.category_combo.get().strip()
+        if category == "Other":
+            custom_category = self.custom_category_entry.get().strip()
+            if custom_category and len(custom_category) > 50:
+                return False, "Custom category must be less than 50 characters"
+            if custom_category and not re.match(r'^[a-zA-Z0-9\s\-_.,()]+$', custom_category):
+                return False, "Custom category contains invalid characters"
+        
         return True, ""
     
     def create_cashbook(self):
@@ -348,6 +426,13 @@ class CashbookCreationDialog:
         name = self.name_entry.get().strip()
         description = self.desc_entry.get().strip()
         category = self.category_combo.get().strip()
+        
+        # Handle custom category
+        if category == "Other":
+            custom_category = self.custom_category_entry.get().strip()
+            if custom_category:
+                category = custom_category
+            # If no custom category entered, keep "Other" as the category
         
         try:
             # Call the callback to create the cashbook
