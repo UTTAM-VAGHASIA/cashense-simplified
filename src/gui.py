@@ -23,6 +23,9 @@ class CashenseApp:
         # Initialize cashbook manager
         self.cashbook_manager = CashbookManager()
         
+        # Set up window close protocol for proper cleanup
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
         self.setup_ui()
     
     def setup_ui(self):
@@ -58,10 +61,38 @@ class CashenseApp:
         except KeyboardInterrupt:
             self.quit_app()
     
-    def quit_app(self):
+    def on_closing(self):
+        """Handle application closing with proper cleanup and data saving."""
+        try:
+            # Ensure all data is saved before closing
+            # The CashbookManager automatically saves data on operations,
+            # but we can trigger a final save to be safe
+            if hasattr(self, 'cashbook_manager'):
+                # Force a final metadata update and save
+                self.cashbook_manager._update_metadata()
+                self.cashbook_manager._save_data()
+            
+            # Update status to indicate saving
+            if hasattr(self, 'dashboard_view'):
+                self.dashboard_view.update_status("Saving data...")
+                # Give a brief moment for the status to show
+                self.root.after(100, self._finalize_close)
+            else:
+                self._finalize_close()
+                
+        except Exception as e:
+            print(f"Error during application close: {e}")
+            # Still close the application even if there's an error
+            self._finalize_close()
+    
+    def _finalize_close(self):
+        """Finalize the application close process."""
         self.root.quit()
         self.root.destroy()
-        sys.exit(0)
+    
+    def quit_app(self):
+        """Legacy quit method - delegates to proper close handler."""
+        self.on_closing()
 
 def main():
     app = CashenseApp()
