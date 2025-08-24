@@ -9,11 +9,11 @@ welcome screen with a modern card-based layout.
 import customtkinter as ctk
 from typing import Optional, Callable
 try:
-    from cashbook_manager import CashbookManager
+    from cashbook_manager import CashbookManager, FileOperationError, DataCorruptionError
     from create_cashbook_card import CreateCashbookCard
     from cashbook_card import CashbookCard
 except ImportError:
-    from .cashbook_manager import CashbookManager
+    from .cashbook_manager import CashbookManager, FileOperationError, DataCorruptionError
     from .create_cashbook_card import CreateCashbookCard
     from .cashbook_card import CashbookCard
 
@@ -139,42 +139,119 @@ class DashboardView(ctk.CTkFrame):
         self.footer_frame = footer_frame
     
     def refresh_cashbooks(self):
-        """Refresh the display of cashbooks in the grid."""
-        # Clear existing grid content
+        """Refresh the display of cashbooks in the grid with error handling."""
+        try:
+            # Clear existing grid content
+            for widget in self.grid_frame.winfo_children():
+                widget.destroy()
+            
+            # Clear see all button if it exists
+            if hasattr(self, 'see_all_button') and self.see_all_button:
+                try:
+                    self.see_all_button.destroy()
+                except:
+                    pass
+                self.see_all_button = None
+            
+            if hasattr(self, 'see_all_frame') and self.see_all_frame:
+                try:
+                    self.see_all_frame.destroy()
+                except:
+                    pass
+                self.see_all_frame = None
+            
+            # Reconfigure grid layout for current window size
+            self.configure_grid_layout()
+            
+            # Get recent cashbooks based on current layout capacity
+            max_visible = self.calculate_max_visible_cashbooks() - 1  # -1 for create card
+            
+            try:
+                recent_cashbooks = self.cashbook_manager.get_recent_cashbooks(limit=max_visible)
+            except Exception as e:
+                # Handle data loading errors
+                self.show_data_error(str(e))
+                return
+            
+            if not recent_cashbooks:
+                # Show empty state
+                self.show_empty_state()
+            else:
+                # Display cashbooks in grid
+                self.display_cashbooks_grid(recent_cashbooks)
+                
+        except Exception as e:
+            # Handle any unexpected errors during refresh
+            self.show_data_error(f"Failed to refresh dashboard: {str(e)}")
+    
+    def show_data_error(self, error_message: str):
+        """Show a data error state in the dashboard."""
+        # Clear existing content
         for widget in self.grid_frame.winfo_children():
             widget.destroy()
         
-        # Clear see all button if it exists
-        if hasattr(self, 'see_all_button') and self.see_all_button:
-            try:
-                self.see_all_button.destroy()
-            except:
-                pass
-            self.see_all_button = None
+        # Create error display
+        error_frame = ctk.CTkFrame(self.grid_frame, fg_color="transparent")
+        error_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=20, pady=40)
         
-        if hasattr(self, 'see_all_frame') and self.see_all_frame:
-            try:
-                self.see_all_frame.destroy()
-            except:
-                pass
-            self.see_all_frame = None
+        # Error icon and message
+        error_icon = ctk.CTkLabel(
+            error_frame,
+            text="⚠️",
+            font=ctk.CTkFont(size=48)
+        )
+        error_icon.pack(pady=(30, 10))
         
-        # Reconfigure grid layout for current window size
-        self.configure_grid_layout()
+        error_title = ctk.CTkLabel(
+            error_frame,
+            text="Data Loading Error",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("red", "lightcoral")
+        )
+        error_title.pack(pady=(0, 5))
         
-        # Get recent cashbooks based on current layout capacity
-        max_visible = self.calculate_max_visible_cashbooks() - 1  # -1 for create card
-        recent_cashbooks = self.cashbook_manager.get_recent_cashbooks(limit=max_visible)
+        error_subtitle = ctk.CTkLabel(
+            error_frame,
+            text=f"Unable to load cashbook data:\n{error_message}",
+            font=ctk.CTkFont(size=14),
+            text_color=("gray60", "gray40"),
+            justify="center"
+        )
+        error_subtitle.pack(pady=(0, 20))
         
-        if not recent_cashbooks:
-            # Show empty state
-            self.show_empty_state()
-        else:
-            # Display cashbooks in grid
-            self.display_cashbooks_grid(recent_cashbooks)
+        # Action buttons
+        button_frame = ctk.CTkFrame(error_frame, fg_color="transparent")
+        button_frame.pack(pady=10)
+        
+        retry_button = ctk.CTkButton(
+            button_frame,
+            text="Retry",
+            command=self.refresh_cashbooks,
+            height=35,
+            width=100
+        )
+        retry_button.pack(side="left", padx=(0, 10))
+        
+        recovery_button = ctk.CTkButton(
+            button_frame,
+            text="Recovery Info",
+            command=self.show_recovery_info,
+            fg_color="transparent",
+            text_color=("blue", "lightblue"),
+            hover_color=("gray90", "gray20"),
+            height=35,
+            width=120
+        )
+        recovery_button.pack(side="left")
+        
+        # Update status
+        self.update_status(f"Error: {error_message}")
     
     def show_empty_state(self):
-        """Display empty state when no cashbooks exist."""
+        """Display empty state when no cashbooks exist with helpful guidance."""
+        # Check for any data recovery information
+        recovery_info = self.cashbook_manager.get_error_recovery_info()
+        
         # Add the create new cashbook card
         create_card = CreateCashbookCard(
             self.grid_frame,
@@ -201,13 +278,61 @@ class DashboardView(ctk.CTkFrame):
         )
         empty_title.pack(pady=(0, 5))
         
-        empty_subtitle = ctk.CTkLabel(
-            empty_frame,
-            text="Create your first cashbook to start tracking expenses",
-            font=ctk.CTkFont(size=14),
-            text_color=("gray60", "gray40")
+        # Show different messages based on recovery status
+        if recovery_info.get("has_backups", False):
+            empty_subtitle = ctk.CTkLabel(
+                empty_frame,
+                text="Your data was recovered from a backup.\nCreate a new cashbook to get started.",
+                font=ctk.CTkFont(size=14),
+                text_color=("gray60", "gray40"),
+                justify="center"
+            )
+            empty_subtitle.pack(pady=(0, 15))
+            
+            # Add recovery info button
+            recovery_button = ctk.CTkButton(
+                empty_frame,
+                text="View Recovery Info",
+                command=self.show_recovery_info,
+                fg_color="transparent",
+                text_color=("blue", "lightblue"),
+                hover_color=("gray90", "gray20"),
+                font=ctk.CTkFont(size=12),
+                height=30,
+                width=120
+            )
+            recovery_button.pack(pady=(0, 15))
+        else:
+            empty_subtitle = ctk.CTkLabel(
+                empty_frame,
+                text="Create your first cashbook to start tracking expenses.\nYou can organize them by category or purpose.",
+                font=ctk.CTkFont(size=14),
+                text_color=("gray60", "gray40"),
+                justify="center"
+            )
+            empty_subtitle.pack(pady=(0, 30))
+        
+        # Add helpful tips
+        tips_frame = ctk.CTkFrame(empty_frame, fg_color=("gray95", "gray15"), corner_radius=8)
+        tips_frame.pack(fill="x", pady=(0, 20))
+        
+        tips_title = ctk.CTkLabel(
+            tips_frame,
+            text="💡 Getting Started Tips",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            anchor="w"
         )
-        empty_subtitle.pack(pady=(0, 30))
+        tips_title.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        tips_text = ctk.CTkLabel(
+            tips_frame,
+            text="• Create separate cashbooks for different purposes\n• Use categories like 'Personal', 'Business', 'Travel'\n• Your data is automatically saved and backed up",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray60", "gray40"),
+            anchor="w",
+            justify="left"
+        )
+        tips_text.pack(anchor="w", padx=15, pady=(0, 10))
     
     def display_cashbooks_grid(self, cashbooks):
         """
@@ -532,6 +657,216 @@ class DashboardView(ctk.CTkFrame):
             # Restore original refresh method
             self.refresh_cashbooks = original_refresh
     
+    def show_recovery_info(self):
+        """Show data recovery information dialog."""
+        recovery_info = self.cashbook_manager.get_error_recovery_info()
+        
+        # Create recovery info window
+        recovery_window = ctk.CTkToplevel(self)
+        recovery_window.title("Data Recovery Information")
+        recovery_window.geometry("600x500")
+        recovery_window.minsize(500, 400)
+        
+        # Configure window grid
+        recovery_window.grid_columnconfigure(0, weight=1)
+        recovery_window.grid_rowconfigure(1, weight=1)
+        
+        # Header
+        header_frame = ctk.CTkFrame(recovery_window, height=60, corner_radius=0)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        header_frame.grid_columnconfigure(0, weight=1)
+        header_frame.grid_propagate(False)
+        
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="🔧 Data Recovery Information",
+            font=ctk.CTkFont(size=18, weight="bold")
+        )
+        title_label.grid(row=0, column=0, sticky="w", padx=20, pady=15)
+        
+        # Close button
+        close_button = ctk.CTkButton(
+            header_frame,
+            text="Close",
+            command=recovery_window.destroy,
+            width=80,
+            height=30
+        )
+        close_button.grid(row=0, column=1, sticky="e", padx=20, pady=15)
+        
+        # Scrollable content area
+        scrollable_frame = ctk.CTkScrollableFrame(recovery_window)
+        scrollable_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+        
+        # Recovery status
+        status_frame = ctk.CTkFrame(scrollable_frame)
+        status_frame.pack(fill="x", pady=(0, 15))
+        
+        status_title = ctk.CTkLabel(
+            status_frame,
+            text="Recovery Status",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        status_title.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        status_text = f"""Data Directory: {recovery_info['data_directory']}
+Total Cashbooks: {recovery_info['total_cashbooks']}
+Has Backup Files: {'Yes' if recovery_info['has_backups'] else 'No'}
+Last Backup: {recovery_info['last_backup'] or 'Never'}"""
+        
+        status_label = ctk.CTkLabel(
+            status_frame,
+            text=status_text,
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+            justify="left"
+        )
+        status_label.pack(anchor="w", padx=15, pady=(0, 10))
+        
+        # Available backups
+        if recovery_info.get("available_backups"):
+            backups_frame = ctk.CTkFrame(scrollable_frame)
+            backups_frame.pack(fill="x", pady=(0, 15))
+            
+            backups_title = ctk.CTkLabel(
+                backups_frame,
+                text="Available Backup Files",
+                font=ctk.CTkFont(size=14, weight="bold"),
+                anchor="w"
+            )
+            backups_title.pack(anchor="w", padx=15, pady=(10, 5))
+            
+            for backup in recovery_info["available_backups"][:5]:  # Show last 5 backups
+                backup_text = f"• {backup['filename']} - Created: {backup['created'][:19]} - Size: {backup['size']} bytes"
+                backup_label = ctk.CTkLabel(
+                    backups_frame,
+                    text=backup_text,
+                    font=ctk.CTkFont(size=10),
+                    anchor="w",
+                    text_color=("gray60", "gray40")
+                )
+                backup_label.pack(anchor="w", padx=25, pady=1)
+            
+            if len(recovery_info["available_backups"]) > 5:
+                more_label = ctk.CTkLabel(
+                    backups_frame,
+                    text=f"... and {len(recovery_info['available_backups']) - 5} more backup files",
+                    font=ctk.CTkFont(size=10),
+                    anchor="w",
+                    text_color=("gray60", "gray40")
+                )
+                more_label.pack(anchor="w", padx=25, pady=(5, 10))
+            else:
+                # Add padding
+                ctk.CTkLabel(backups_frame, text="").pack(pady=5)
+        
+        # Data integrity check
+        integrity_frame = ctk.CTkFrame(scrollable_frame)
+        integrity_frame.pack(fill="x", pady=(0, 15))
+        
+        integrity_title = ctk.CTkLabel(
+            integrity_frame,
+            text="Data Integrity Check",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        integrity_title.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        # Run integrity check
+        integrity_report = self.cashbook_manager.validate_data_integrity()
+        
+        if integrity_report["is_valid"]:
+            integrity_text = "✅ All data is valid and consistent"
+            integrity_color = ("green", "lightgreen")
+        else:
+            integrity_text = f"⚠️ Found {len(integrity_report['issues'])} data issues"
+            integrity_color = ("orange", "yellow")
+        
+        integrity_status = ctk.CTkLabel(
+            integrity_frame,
+            text=integrity_text,
+            font=ctk.CTkFont(size=12),
+            anchor="w",
+            text_color=integrity_color
+        )
+        integrity_status.pack(anchor="w", padx=15, pady=(0, 5))
+        
+        if not integrity_report["is_valid"]:
+            for issue in integrity_report["issues"]:
+                issue_label = ctk.CTkLabel(
+                    integrity_frame,
+                    text=f"• {issue}",
+                    font=ctk.CTkFont(size=10),
+                    anchor="w",
+                    text_color=("gray60", "gray40")
+                )
+                issue_label.pack(anchor="w", padx=25, pady=1)
+        
+        ctk.CTkLabel(integrity_frame, text="").pack(pady=5)  # Padding
+        
+        # Actions
+        actions_frame = ctk.CTkFrame(scrollable_frame)
+        actions_frame.pack(fill="x", pady=(0, 15))
+        
+        actions_title = ctk.CTkLabel(
+            actions_frame,
+            text="Available Actions",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
+        )
+        actions_title.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        # Create backup button
+        backup_button = ctk.CTkButton(
+            actions_frame,
+            text="Create Backup Now",
+            command=lambda: self.create_manual_backup(recovery_window),
+            height=35,
+            width=150
+        )
+        backup_button.pack(anchor="w", padx=15, pady=5)
+        
+        ctk.CTkLabel(actions_frame, text="").pack(pady=5)  # Padding
+        
+        # Center the window
+        recovery_window.transient(self.winfo_toplevel())
+        recovery_window.grab_set()
+        recovery_window.focus()
+    
+    def create_manual_backup(self, parent_window):
+        """Create a manual backup and show result."""
+        try:
+            backup_path = self.cashbook_manager.backup_data()
+            
+            # Show success message
+            try:
+                from CTkMessagebox import CTkMessagebox
+                CTkMessagebox(
+                    title="Backup Created",
+                    message=f"Backup successfully created at:\n{backup_path}",
+                    icon="check",
+                    option_1="OK"
+                )
+            except ImportError:
+                self.update_status(f"Backup created: {backup_path}")
+            
+            # Close recovery window and refresh
+            parent_window.destroy()
+            
+        except Exception as e:
+            # Show error message
+            try:
+                from CTkMessagebox import CTkMessagebox
+                CTkMessagebox(
+                    title="Backup Failed",
+                    message=f"Failed to create backup:\n{str(e)}",
+                    icon="cancel",
+                    option_1="OK"
+                )
+            except ImportError:
+                self.update_status(f"Backup failed: {str(e)}")
+    
     def configure_grid_layout(self):
         """Configure the grid layout based on current window size."""
         # Get current window width
@@ -599,7 +934,7 @@ class DashboardView(ctk.CTkFrame):
     
     def handle_cashbook_creation(self, name: str, description: str, category: str):
         """
-        Handle the creation of a new cashbook.
+        Handle the creation of a new cashbook with comprehensive error handling.
         
         Args:
             name: Name of the new cashbook
@@ -620,13 +955,95 @@ class DashboardView(ctk.CTkFrame):
             # Update status
             self.update_status(f"Created cashbook '{name}' successfully")
             
-        except Exception as e:
-            # Show error message
-            from tkinter import messagebox
-            messagebox.showerror(
-                "Error Creating Cashbook",
-                f"Failed to create cashbook: {str(e)}"
+        except ValueError as e:
+            # Handle validation errors
+            self.show_error_dialog(
+                "Invalid Input",
+                f"Cannot create cashbook: {str(e)}",
+                "Please check your input and try again."
             )
+        except (FileOperationError, IOError, OSError) as e:
+            # Handle file operation errors
+            self.show_error_dialog(
+                "File Operation Error",
+                f"Cannot save cashbook data: {str(e)}",
+                "Please check file permissions and available disk space."
+            )
+        except Exception as e:
+            # Handle unexpected errors
+            self.show_error_dialog(
+                "Unexpected Error",
+                f"Failed to create cashbook: {str(e)}",
+                "Please try again or contact support if the problem persists."
+            )
+    
+    def show_error_dialog(self, title: str, message: str, suggestion: str = ""):
+        """
+        Show a user-friendly error dialog with recovery suggestions.
+        
+        Args:
+            title: Error dialog title
+            message: Main error message
+            suggestion: Optional suggestion for recovery
+        """
+        try:
+            from CTkMessagebox import CTkMessagebox
+            
+            full_message = message
+            if suggestion:
+                full_message += f"\n\n{suggestion}"
+            
+            CTkMessagebox(
+                title=title,
+                message=full_message,
+                icon="cancel",
+                option_1="OK"
+            )
+        except ImportError:
+            # Fallback to tkinter messagebox
+            try:
+                from tkinter import messagebox
+                full_message = message
+                if suggestion:
+                    full_message += f"\n\n{suggestion}"
+                messagebox.showerror(title, full_message)
+            except ImportError:
+                # Last resort: update status
+                self.update_status(f"Error: {message}")
+    
+    def show_warning_dialog(self, title: str, message: str, suggestion: str = ""):
+        """
+        Show a user-friendly warning dialog.
+        
+        Args:
+            title: Warning dialog title
+            message: Main warning message
+            suggestion: Optional suggestion
+        """
+        try:
+            from CTkMessagebox import CTkMessagebox
+            
+            full_message = message
+            if suggestion:
+                full_message += f"\n\n{suggestion}"
+            
+            CTkMessagebox(
+                title=title,
+                message=full_message,
+                icon="warning",
+                option_1="OK"
+            )
+        except ImportError:
+            # Fallback to tkinter messagebox
+            try:
+                from tkinter import messagebox
+                full_message = message
+                if suggestion:
+                    full_message += f"\n\n{suggestion}"
+                messagebox.showwarning(title, full_message)
+            except ImportError:
+                # Last resort: update status
+                self.update_status(f"Warning: {message}")
     
     def handle_cashbook_rename(self, cashbook_id: str):
         """
@@ -700,10 +1117,24 @@ class DashboardView(ctk.CTkFrame):
                         option_1="OK"
                     )
                     
+                except ValueError as e:
+                    CTkMessagebox(
+                        title="Invalid Input",
+                        message=f"Cannot rename cashbook: {str(e)}",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+                except (FileOperationError, IOError, OSError) as e:
+                    CTkMessagebox(
+                        title="File Operation Error",
+                        message=f"Cannot save changes: {str(e)}\n\nPlease check file permissions and try again.",
+                        icon="cancel",
+                        option_1="OK"
+                    )
                 except Exception as e:
                     CTkMessagebox(
-                        title="Error",
-                        message=f"Failed to rename cashbook: {str(e)}",
+                        title="Unexpected Error",
+                        message=f"Failed to rename cashbook: {str(e)}\n\nPlease try again or restart the application.",
                         icon="cancel",
                         option_1="OK"
                     )
@@ -745,9 +1176,40 @@ class DashboardView(ctk.CTkFrame):
             if response == "Delete":
                 try:
                     # Delete the cashbook
-                    self.cashbook_manager.delete_cashbook(cashbook_id)
-                    self.refresh_cashbooks()
-                    self.update_status(f"Deleted cashbook '{cashbook.name}'")
+                    success = self.cashbook_manager.delete_cashbook(cashbook_id)
+                    if success:
+                        self.refresh_cashbooks()
+                        self.update_status(f"Deleted cashbook '{cashbook.name}' successfully")
+                        
+                        # Show success message
+                        CTkMessagebox(
+                            title="Deleted",
+                            message=f"Cashbook '{cashbook.name}' has been deleted successfully.",
+                            icon="check",
+                            option_1="OK"
+                        )
+                    else:
+                        CTkMessagebox(
+                            title="Error",
+                            message=f"Cashbook '{cashbook.name}' could not be found for deletion.",
+                            icon="cancel",
+                            option_1="OK"
+                        )
+                        
+                except (FileOperationError, IOError, OSError) as e:
+                    CTkMessagebox(
+                        title="File Operation Error",
+                        message=f"Cannot delete cashbook: {str(e)}\n\nPlease check file permissions and try again.",
+                        icon="cancel",
+                        option_1="OK"
+                    )
+                except Exception as e:
+                    CTkMessagebox(
+                        title="Unexpected Error",
+                        message=f"Failed to delete cashbook: {str(e)}\n\nPlease try again or restart the application.",
+                        icon="cancel",
+                        option_1="OK"
+                    )
                     
                     # Show success message
                     CTkMessagebox(

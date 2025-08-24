@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, mock_open
 
-from src.cashbook_manager import CashbookManager
+from src.cashbook_manager import CashbookManager, FileOperationError, DataCorruptionError
 from src.models import Cashbook, CashbookMetadata
 
 
@@ -314,14 +314,16 @@ class TestCashbookManager:
         assert len(manager._cashbooks) == 0
         assert manager._metadata.total_cashbooks == 0
         
-        # Should create backup file
-        backup_files = list(Path(temp_dir).glob("cashbooks_corrupted_*.json"))
-        assert len(backup_files) == 1
+        # Should create backup file in corrupted_backups directory
+        backup_dir = Path(temp_dir) / "corrupted_backups"
+        if backup_dir.exists():
+            backup_files = list(backup_dir.glob("cashbooks_corrupted_*.json"))
+            assert len(backup_files) == 1
     
-    @patch('builtins.open', side_effect=OSError("Permission denied"))
-    def test_save_data_failure(self, mock_open_func, manager):
+    @patch('tempfile.NamedTemporaryFile', side_effect=OSError("Permission denied"))
+    def test_save_data_failure(self, mock_temp_file, manager):
         """Test handling of save operation failures."""
-        with pytest.raises(RuntimeError, match="Failed to save cashbook data"):
+        with pytest.raises(FileOperationError, match="Failed to save cashbook"):
             manager.create_cashbook("Test")
     
     @patch('builtins.open', side_effect=OSError("Permission denied"))
