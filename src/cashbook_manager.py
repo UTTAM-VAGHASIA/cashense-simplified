@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 try:
     from models import Cashbook, CashbookMetadata, generate_cashbook_id
+    from theme_manager import theme
 except ImportError:
     from .models import Cashbook, CashbookMetadata, generate_cashbook_id
+    from .theme_manager import theme
 
 
 class CashbookError(Exception):
@@ -307,12 +309,13 @@ class CashbookManager:
         # Generate unique ID
         cashbook_id = generate_cashbook_id()
         
-        # Create cashbook (validation happens in __post_init__)
+        # Create cashbook with theme-based color assignment (validation happens in __post_init__)
         cashbook = Cashbook(
             id=cashbook_id,
             name=name,
             description=description,
-            category=category
+            category=category,
+            icon_color=theme.get_cashbook_color(cashbook_id)
         )
         
         # Add to cache

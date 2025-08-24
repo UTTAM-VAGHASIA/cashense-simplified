@@ -53,7 +53,7 @@ class TestCreateCashbookCard(unittest.TestCase):
     
     def test_plus_icon_text(self):
         """Test that the plus icon displays correct text."""
-        self.assertEqual(self.card.plus_icon.cget('text'), '＋')
+        self.assertEqual(self.card.plus_icon.cget('text'), '➕')
     
     def test_create_label_text(self):
         """Test that the create label displays correct text."""

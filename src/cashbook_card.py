@@ -11,8 +11,10 @@ from datetime import datetime
 from typing import Callable, Optional
 try:
     from models import Cashbook
+    from theme_manager import theme, animations, icons
 except ImportError:
     from .models import Cashbook
+    from .theme_manager import theme, animations, icons
 
 
 class CashbookCard(ctk.CTkFrame):
@@ -44,14 +46,10 @@ class CashbookCard(ctk.CTkFrame):
                                     Should accept (cashbook_id, x, y) parameters
             **kwargs: Additional arguments passed to CTkFrame
         """
-        # Set default styling for the cashbook card
+        # Set enhanced styling for the cashbook card using theme system
+        card_style = theme.get_card_style('default')
         default_kwargs = {
-            'width': 250,
-            'height': 150,
-            'corner_radius': 10,
-            'border_width': 1,
-            'border_color': ("gray80", "gray25"),
-            'fg_color': ("white", "gray20"),
+            **card_style,
             'cursor': 'hand2'
         }
         default_kwargs.update(kwargs)
@@ -66,6 +64,9 @@ class CashbookCard(ctk.CTkFrame):
         # Store original colors for hover effects
         self.original_fg_color = self.cget("fg_color")
         self.original_border_color = self.cget("border_color")
+        
+        # Get consistent color for this cashbook
+        self.cashbook_color = theme.get_cashbook_color(cashbook_data.id)
         
         self.setup_ui()
         self.setup_events()
@@ -88,109 +89,133 @@ class CashbookCard(ctk.CTkFrame):
         self.create_footer_section()
     
     def create_header_section(self):
-        """Create the header section with cashbook name and visual indicator."""
+        """Create the header section with cashbook name and enhanced visual indicators."""
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 5))
+        header_frame.grid(row=0, column=0, sticky="ew", padx=theme.SPACING['md'], pady=(theme.SPACING['md'], theme.SPACING['sm']))
         header_frame.grid_columnconfigure(0, weight=1)
         header_frame.grid_columnconfigure(1, weight=0)
+        header_frame.grid_columnconfigure(2, weight=0)
+        
+        # Category icon (if available)
+        category_icon = icons.get_category_icon(self.cashbook_data.category or 'other')
+        self.category_icon = ctk.CTkLabel(
+            header_frame,
+            text=category_icon,
+            font=theme.create_font('lg'),
+            width=24
+        )
+        self.category_icon.grid(row=0, column=0, sticky="w")
         
         # Cashbook name (truncated if too long)
         display_name = self.cashbook_data.name
-        if len(display_name) > 20:
-            display_name = display_name[:17] + "..."
+        if len(display_name) > 18:
+            display_name = display_name[:15] + "..."
         
         self.name_label = ctk.CTkLabel(
             header_frame,
             text=display_name,
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=theme.create_font('lg', 'bold'),
+            text_color=(theme.DARK_THEME['text_primary'], theme.DARK_THEME['text_primary']),
             anchor="w"
         )
-        self.name_label.grid(row=0, column=0, sticky="w")
+        self.name_label.grid(row=0, column=1, sticky="w", padx=(theme.SPACING['sm'], 0))
         
-        # Visual indicator (colored circle based on icon_color)
+        # Enhanced visual indicator with cashbook-specific color
         self.color_indicator = ctk.CTkLabel(
             header_frame,
             text="●",
-            font=ctk.CTkFont(size=20),
-            text_color=self.cashbook_data.icon_color,
+            font=theme.create_font('xl'),
+            text_color=self.cashbook_color,
             width=20
         )
-        self.color_indicator.grid(row=0, column=1, sticky="e", padx=(5, 0))
+        self.color_indicator.grid(row=0, column=2, sticky="e", padx=(theme.SPACING['sm'], 0))
     
     def create_content_section(self):
-        """Create the content section with cashbook details."""
+        """Create the content section with enhanced cashbook details."""
         content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        content_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=5)
+        content_frame.grid(row=1, column=0, sticky="nsew", padx=theme.SPACING['md'], pady=theme.SPACING['sm'])
         content_frame.grid_columnconfigure(0, weight=1)
         
-        # Creation date
+        # Creation date with icon
         date_str = self.format_date(self.cashbook_data.created_date)
         self.date_label = ctk.CTkLabel(
             content_frame,
-            text=f"Created: {date_str}",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray60", "gray40"),
+            text=f"📅 {date_str}",
+            font=theme.create_font('sm'),
+            text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary']),
             anchor="w"
         )
-        self.date_label.grid(row=0, column=0, sticky="w", pady=(0, 3))
+        self.date_label.grid(row=0, column=0, sticky="w", pady=(0, theme.SPACING['xs']))
         
-        # Entry count
-        entry_text = f"{self.cashbook_data.entry_count} "
+        # Entry count with icon
+        entry_text = f"📝 {self.cashbook_data.entry_count} "
         entry_text += "entry" if self.cashbook_data.entry_count == 1 else "entries"
         
         self.entry_label = ctk.CTkLabel(
             content_frame,
             text=entry_text,
-            font=ctk.CTkFont(size=12),
-            text_color=("gray60", "gray40"),
+            font=theme.create_font('sm'),
+            text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary']),
             anchor="w"
         )
-        self.entry_label.grid(row=1, column=0, sticky="w", pady=3)
+        self.entry_label.grid(row=1, column=0, sticky="w", pady=theme.SPACING['xs'])
         
-        # Total amount (if there are entries)
+        # Total amount with enhanced styling (if there are entries)
         if self.cashbook_data.entry_count > 0:
-            amount_text = f"Total: ${self.cashbook_data.total_amount:.2f}"
+            amount_text = f"💰 ${self.cashbook_data.total_amount:.2f}"
+            amount_color = theme.DARK_THEME['success'] if self.cashbook_data.total_amount >= 0 else theme.DARK_THEME['error']
+            
             self.amount_label = ctk.CTkLabel(
                 content_frame,
                 text=amount_text,
-                font=ctk.CTkFont(size=12),
-                text_color=("gray60", "gray40"),
+                font=theme.create_font('sm', 'medium'),
+                text_color=(amount_color, amount_color),
                 anchor="w"
             )
-            self.amount_label.grid(row=2, column=0, sticky="w", pady=3)
+            self.amount_label.grid(row=2, column=0, sticky="w", pady=theme.SPACING['xs'])
         
         # Last modified (if different from created date)
         if self.cashbook_data.last_modified.date() != self.cashbook_data.created_date.date():
             modified_str = self.format_date(self.cashbook_data.last_modified)
             self.modified_label = ctk.CTkLabel(
                 content_frame,
-                text=f"Modified: {modified_str}",
-                font=ctk.CTkFont(size=11),
-                text_color=("gray50", "gray50"),
+                text=f"✏️ {modified_str}",
+                font=theme.create_font('xs'),
+                text_color=(theme.DARK_THEME['text_muted'], theme.DARK_THEME['text_muted']),
                 anchor="w"
             )
-            self.modified_label.grid(row=3, column=0, sticky="w", pady=(3, 0))
+            self.modified_label.grid(row=3, column=0, sticky="w", pady=(theme.SPACING['xs'], 0))
     
     def create_footer_section(self):
-        """Create the footer section with category information."""
+        """Create the footer section with enhanced category information."""
         if self.cashbook_data.category:
             footer_frame = ctk.CTkFrame(self, fg_color="transparent")
-            footer_frame.grid(row=2, column=0, sticky="ew", padx=15, pady=(5, 15))
+            footer_frame.grid(row=2, column=0, sticky="ew", padx=theme.SPACING['md'], pady=(theme.SPACING['sm'], theme.SPACING['md']))
             footer_frame.grid_columnconfigure(0, weight=1)
             
-            # Category badge
+            # Enhanced category badge with background
             category_text = self.cashbook_data.category
-            if len(category_text) > 15:
-                category_text = category_text[:12] + "..."
+            if len(category_text) > 12:
+                category_text = category_text[:9] + "..."
+            
+            # Create a subtle background for the category
+            category_bg = ctk.CTkFrame(
+                footer_frame,
+                fg_color=(theme.DARK_THEME['secondary'], theme.DARK_THEME['secondary']),
+                corner_radius=theme.RADIUS['sm'],
+                height=22
+            )
+            category_bg.grid(row=0, column=0, sticky="w")
+            category_bg.grid_propagate(False)
             
             self.category_label = ctk.CTkLabel(
-                footer_frame,
-                text=f"📁 {category_text}",
-                font=ctk.CTkFont(size=11),
-                text_color=("gray50", "gray50"),
-                anchor="w"
+                category_bg,
+                text=f"  {category_text}  ",
+                font=theme.create_font('xs', 'medium'),
+                text_color=(self.cashbook_color, self.cashbook_color),
+                anchor="center"
             )
-            self.category_label.grid(row=0, column=0, sticky="w")
+            self.category_label.pack(expand=True, fill="both")
     
     def format_date(self, date: datetime) -> str:
         """
@@ -283,24 +308,38 @@ class CashbookCard(ctk.CTkFrame):
     
     def handle_hover_enter(self, event=None):
         """
-        Handle mouse enter events for hover effect.
+        Handle mouse enter events for enhanced hover effect with smooth transitions.
         
         Args:
             event: Tkinter event object (optional)
         """
-        # Change card appearance on hover
+        # Enhanced hover styling using theme system
+        hover_style = theme.get_card_style('hover')
+        
+        # Apply hover effects with cashbook-specific accent color
         self.configure(
-            fg_color=("gray95", "gray25"),
-            border_color=self.cashbook_data.icon_color
+            fg_color=hover_style['fg_color'],
+            border_color=(self.cashbook_color, self.cashbook_color)
         )
         
-        # Slightly brighten the text colors
+        # Enhance text colors on hover
         if hasattr(self, 'name_label'):
-            self.name_label.configure(text_color=self.cashbook_data.icon_color)
+            self.name_label.configure(text_color=(self.cashbook_color, self.cashbook_color))
+        
+        if hasattr(self, 'color_indicator'):
+            # Make the color indicator slightly larger on hover
+            self.color_indicator.configure(
+                text="⬤",  # Filled circle
+                text_color=(self.cashbook_color, self.cashbook_color)
+            )
+        
+        # Add subtle glow effect to category icon
+        if hasattr(self, 'category_icon'):
+            self.category_icon.configure(text_color=(self.cashbook_color, self.cashbook_color))
     
     def handle_hover_leave(self, event=None):
         """
-        Handle mouse leave events to restore normal appearance.
+        Handle mouse leave events to restore normal appearance with smooth transitions.
         
         Args:
             event: Tkinter event object (optional)
@@ -313,7 +352,22 @@ class CashbookCard(ctk.CTkFrame):
         
         # Restore original text colors
         if hasattr(self, 'name_label'):
-            self.name_label.configure(text_color=("gray10", "gray90"))
+            self.name_label.configure(
+                text_color=(theme.DARK_THEME['text_primary'], theme.DARK_THEME['text_primary'])
+            )
+        
+        if hasattr(self, 'color_indicator'):
+            # Restore normal color indicator
+            self.color_indicator.configure(
+                text="●",  # Regular circle
+                text_color=(self.cashbook_color, self.cashbook_color)
+            )
+        
+        # Restore category icon color
+        if hasattr(self, 'category_icon'):
+            self.category_icon.configure(
+                text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary'])
+            )
     
     def handle_context_menu(self, event):
         """

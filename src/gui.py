@@ -4,21 +4,26 @@ import sys
 try:
     from dashboard_view import DashboardView
     from cashbook_manager import CashbookManager
+    from theme_manager import theme, animations, icons
 except ImportError:
     from .dashboard_view import DashboardView
     from .cashbook_manager import CashbookManager
+    from .theme_manager import theme, animations, icons
 
 class CashenseApp:
     def __init__(self):
-        # Set appearance mode and color theme
+        # Set appearance mode and enhanced color theme
         ctk.set_appearance_mode("dark")  # Modes: "System" (standard), "Dark", "Light"
         ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
         
-        # Create main window
+        # Create main window with enhanced styling
         self.root = ctk.CTk()
-        self.root.title("Cashense - Personal Finance Tracker")
+        self.root.title("💰 Cashense - Personal Finance Tracker")
         self.root.geometry("800x600")
         self.root.minsize(600, 400)
+        
+        # Apply enhanced window styling
+        self.root.configure(fg_color=theme.DARK_THEME['background'])
         
         # Initialize cashbook manager
         self.cashbook_manager = CashbookManager()

@@ -9,6 +9,10 @@ import customtkinter as ctk
 from tkinter import messagebox
 from typing import Callable, Optional
 import re
+try:
+    from theme_manager import theme, animations, icons
+except ImportError:
+    from .theme_manager import theme, animations, icons
 
 
 class CreateCashbookCard(ctk.CTkFrame):
@@ -29,14 +33,10 @@ class CreateCashbookCard(ctk.CTkFrame):
                                Should accept (name, description, category) parameters
             **kwargs: Additional arguments passed to CTkFrame
         """
-        # Set default styling for the create card
+        # Set enhanced styling for the create card using theme system
+        create_style = theme.get_card_style('create')
         default_kwargs = {
-            'width': 250,
-            'height': 150,
-            'corner_radius': 10,
-            'border_width': 2,
-            'border_color': ("gray70", "gray30"),
-            'fg_color': ("gray95", "gray15"),
+            **create_style,
             'cursor': 'hand2'
         }
         default_kwargs.update(kwargs)
@@ -50,7 +50,7 @@ class CreateCashbookCard(ctk.CTkFrame):
         self.setup_events()
     
     def setup_ui(self):
-        """Set up the UI elements of the create card."""
+        """Set up the enhanced UI elements of the create card."""
         # Configure grid for centering content
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -59,23 +59,32 @@ class CreateCashbookCard(ctk.CTkFrame):
         content_frame = ctk.CTkFrame(self, fg_color="transparent")
         content_frame.grid(row=0, column=0, sticky="")
         
-        # Plus icon
+        # Enhanced plus icon with better styling
         self.plus_icon = ctk.CTkLabel(
             content_frame,
-            text="＋",  # Using full-width plus sign for better visibility
-            font=ctk.CTkFont(size=36, weight="bold"),
-            text_color=("gray60", "gray50")
+            text="➕",  # Using emoji plus for better visual appeal
+            font=theme.create_font('heading'),
+            text_color=(theme.DARK_THEME['text_muted'], theme.DARK_THEME['text_muted'])
         )
-        self.plus_icon.pack(pady=(10, 5))
+        self.plus_icon.pack(pady=(theme.SPACING['md'], theme.SPACING['sm']))
         
-        # Create new cashbook text
+        # Enhanced create new cashbook text
         self.create_label = ctk.CTkLabel(
             content_frame,
             text="Create new cashbook",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=("gray70", "gray40")
+            font=theme.create_font('base', 'bold'),
+            text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary'])
         )
-        self.create_label.pack(pady=(0, 10))
+        self.create_label.pack(pady=(0, theme.SPACING['md']))
+        
+        # Subtle hint text
+        self.hint_label = ctk.CTkLabel(
+            content_frame,
+            text="Click to get started",
+            font=theme.create_font('xs'),
+            text_color=(theme.DARK_THEME['text_muted'], theme.DARK_THEME['text_muted'])
+        )
+        self.hint_label.pack()
     
     def setup_events(self):
         """Set up event handlers for the card."""
@@ -84,35 +93,44 @@ class CreateCashbookCard(ctk.CTkFrame):
         self.plus_icon.bind("<Button-1>", self.handle_click)
         self.create_label.bind("<Button-1>", self.handle_click)
         
-        # Bind hover events for visual feedback
-        self.bind("<Enter>", self.on_hover_enter)
-        self.bind("<Leave>", self.on_hover_leave)
-        self.plus_icon.bind("<Enter>", self.on_hover_enter)
-        self.plus_icon.bind("<Leave>", self.on_hover_leave)
-        self.create_label.bind("<Enter>", self.on_hover_enter)
-        self.create_label.bind("<Leave>", self.on_hover_leave)
+        # Bind hover events for enhanced visual feedback
+        widgets_to_bind = [self, self.plus_icon, self.create_label, self.hint_label]
+        for widget in widgets_to_bind:
+            widget.bind("<Enter>", self.on_hover_enter)
+            widget.bind("<Leave>", self.on_hover_leave)
     
     def handle_click(self, event=None):
         """Handle click events to open the cashbook creation dialog."""
         self.show_creation_dialog()
     
     def on_hover_enter(self, event=None):
-        """Handle mouse enter events for hover effect."""
+        """Handle mouse enter events for enhanced hover effect."""
+        # Enhanced hover styling using theme system
         self.configure(
-            fg_color=("gray90", "gray20"),
-            border_color=("blue", "lightblue")
+            fg_color=(theme.DARK_THEME['hover'], theme.DARK_THEME['hover']),
+            border_color=(theme.DARK_THEME['accent'], theme.DARK_THEME['accent'])
         )
-        self.plus_icon.configure(text_color=("blue", "lightblue"))
-        self.create_label.configure(text_color=("blue", "lightblue"))
+        
+        # Animate text colors to accent color
+        self.plus_icon.configure(text_color=(theme.DARK_THEME['accent'], theme.DARK_THEME['accent']))
+        self.create_label.configure(text_color=(theme.DARK_THEME['accent'], theme.DARK_THEME['accent']))
+        if hasattr(self, 'hint_label'):
+            self.hint_label.configure(text_color=(theme.DARK_THEME['accent'], theme.DARK_THEME['accent']))
     
     def on_hover_leave(self, event=None):
         """Handle mouse leave events to restore normal appearance."""
+        # Restore original styling
+        create_style = theme.get_card_style('create')
         self.configure(
-            fg_color=("gray95", "gray15"),
-            border_color=("gray70", "gray30")
+            fg_color=create_style['fg_color'],
+            border_color=create_style['border_color']
         )
-        self.plus_icon.configure(text_color=("gray60", "gray50"))
-        self.create_label.configure(text_color=("gray70", "gray40"))
+        
+        # Restore original text colors
+        self.plus_icon.configure(text_color=(theme.DARK_THEME['text_muted'], theme.DARK_THEME['text_muted']))
+        self.create_label.configure(text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary']))
+        if hasattr(self, 'hint_label'):
+            self.hint_label.configure(text_color=(theme.DARK_THEME['text_muted'], theme.DARK_THEME['text_muted']))
     
     def show_creation_dialog(self):
         """Show the cashbook creation dialog with form validation."""
@@ -197,124 +215,130 @@ class CashbookCreationDialog:
         # Configure grid
         self.dialog.grid_columnconfigure(0, weight=1)
         
-        # Title
+        # Enhanced title with icon
         title_label = ctk.CTkLabel(
             self.dialog,
-            text="Create New Cashbook",
-            font=ctk.CTkFont(size=20, weight="bold")
+            text="📚 Create New Cashbook",
+            font=theme.create_font('title', 'bold'),
+            text_color=(theme.DARK_THEME['text_primary'], theme.DARK_THEME['text_primary'])
         )
-        title_label.grid(row=0, column=0, pady=(20, 30), padx=20, sticky="w")
+        title_label.grid(row=0, column=0, pady=(theme.SPACING['lg'], theme.SPACING['xl']), padx=theme.SPACING['lg'], sticky="w")
         
-        # Name field (required)
+        # Enhanced name field (required)
         name_label = ctk.CTkLabel(
             self.dialog,
             text="Cashbook Name *",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=theme.create_font('base', 'bold'),
+            text_color=(theme.DARK_THEME['text_primary'], theme.DARK_THEME['text_primary']),
             anchor="w"
         )
-        name_label.grid(row=1, column=0, pady=(0, 5), padx=20, sticky="ew")
+        name_label.grid(row=1, column=0, pady=(0, theme.SPACING['sm']), padx=theme.SPACING['lg'], sticky="ew")
         
         self.name_entry = ctk.CTkEntry(
             self.dialog,
             placeholder_text="Enter cashbook name...",
-            font=ctk.CTkFont(size=12),
-            height=35
+            font=theme.create_font('sm'),
+            height=40,
+            corner_radius=theme.RADIUS['base']
         )
-        self.name_entry.grid(row=2, column=0, pady=(0, 15), padx=20, sticky="ew")
+        self.name_entry.grid(row=2, column=0, pady=(0, theme.SPACING['md']), padx=theme.SPACING['lg'], sticky="ew")
         
-        # Description field (optional)
+        # Enhanced description field (optional)
         desc_label = ctk.CTkLabel(
             self.dialog,
             text="Description (Optional)",
-            font=ctk.CTkFont(size=14),
+            font=theme.create_font('base'),
+            text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary']),
             anchor="w"
         )
-        desc_label.grid(row=3, column=0, pady=(0, 5), padx=20, sticky="ew")
+        desc_label.grid(row=3, column=0, pady=(0, theme.SPACING['sm']), padx=theme.SPACING['lg'], sticky="ew")
         
         self.desc_entry = ctk.CTkEntry(
             self.dialog,
             placeholder_text="Enter description...",
-            font=ctk.CTkFont(size=12),
-            height=35
+            font=theme.create_font('sm'),
+            height=40,
+            corner_radius=theme.RADIUS['base']
         )
-        self.desc_entry.grid(row=4, column=0, pady=(0, 15), padx=20, sticky="ew")
+        self.desc_entry.grid(row=4, column=0, pady=(0, theme.SPACING['md']), padx=theme.SPACING['lg'], sticky="ew")
         
-        # Category field (optional)
+        # Enhanced category field (optional)
         category_label = ctk.CTkLabel(
             self.dialog,
             text="Category (Optional)",
-            font=ctk.CTkFont(size=14),
+            font=theme.create_font('base'),
+            text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary']),
             anchor="w"
         )
-        category_label.grid(row=5, column=0, pady=(0, 5), padx=20, sticky="ew")
+        category_label.grid(row=5, column=0, pady=(0, theme.SPACING['sm']), padx=theme.SPACING['lg'], sticky="ew")
         
         self.category_combo = ctk.CTkComboBox(
             self.dialog,
             values=self.categories,
-            font=ctk.CTkFont(size=12),
-            height=35,
+            font=theme.create_font('sm'),
+            height=40,
+            corner_radius=theme.RADIUS['base'],
             state="readonly",
             command=self.on_category_change
         )
         self.category_combo.set("")  # No default selection
-        self.category_combo.grid(row=6, column=0, pady=(0, 15), padx=20, sticky="ew")
+        self.category_combo.grid(row=6, column=0, pady=(0, theme.SPACING['md']), padx=theme.SPACING['lg'], sticky="ew")
         
-        # Custom category field (initially hidden)
+        # Enhanced custom category field (initially hidden)
         self.custom_category_label = ctk.CTkLabel(
             self.dialog,
             text="Custom Category",
-            font=ctk.CTkFont(size=14),
+            font=theme.create_font('base'),
+            text_color=(theme.DARK_THEME['text_secondary'], theme.DARK_THEME['text_secondary']),
             anchor="w"
         )
         
         self.custom_category_entry = ctk.CTkEntry(
             self.dialog,
             placeholder_text="Enter custom category...",
-            font=ctk.CTkFont(size=12),
-            height=35
+            font=theme.create_font('sm'),
+            height=40,
+            corner_radius=theme.RADIUS['base']
         )
         
         # Initially hide custom category widgets
         self.custom_category_widgets_visible = False
         
-        # Error label for validation messages
+        # Enhanced error label for validation messages
         self.error_label = ctk.CTkLabel(
             self.dialog,
             text="",
-            font=ctk.CTkFont(size=11),
-            text_color="red",
+            font=theme.create_font('xs'),
+            text_color=(theme.DARK_THEME['error'], theme.DARK_THEME['error']),
             anchor="w"
         )
-        self.error_label.grid(row=9, column=0, pady=(0, 10), padx=20, sticky="ew")
+        self.error_label.grid(row=9, column=0, pady=(0, theme.SPACING['md']), padx=theme.SPACING['lg'], sticky="ew")
         
-        # Buttons frame
+        # Enhanced buttons frame
         self.buttons_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
-        self.buttons_frame.grid(row=10, column=0, pady=(0, 20), padx=20, sticky="ew")
+        self.buttons_frame.grid(row=10, column=0, pady=(0, theme.SPACING['lg']), padx=theme.SPACING['lg'], sticky="ew")
         self.buttons_frame.grid_columnconfigure(0, weight=1)
         self.buttons_frame.grid_columnconfigure(1, weight=1)
         
-        # Cancel button
+        # Enhanced cancel button
+        cancel_style = theme.get_button_style('ghost')
         self.cancel_button = ctk.CTkButton(
             self.buttons_frame,
             text="Cancel",
             command=self.cancel_creation,
-            fg_color="transparent",
-            border_width=2,
-            text_color=("gray10", "gray90"),
-            border_color=("gray70", "gray30"),
-            hover_color=("gray90", "gray20"),
-            height=35
+            **cancel_style
         )
-        self.cancel_button.grid(row=0, column=0, padx=(0, 10), sticky="ew")
+        self.cancel_button.grid(row=0, column=0, padx=(0, theme.SPACING['sm']), sticky="ew")
         
-        # Create button
+        # Enhanced create button
+        primary_style = theme.get_button_style('primary')
         self.create_button = ctk.CTkButton(
             self.buttons_frame,
-            text="Create Cashbook",
+            text="✨ Create Cashbook",
             command=self.create_cashbook,
-            height=35
+            **primary_style
         )
-        self.create_button.grid(row=0, column=1, padx=(10, 0), sticky="ew")
+        self.create_button.grid(row=0, column=1, padx=(theme.SPACING['sm'], 0), sticky="ew")
         
         # Bind Enter key to create button
         self.dialog.bind("<Return>", lambda e: self.create_cashbook())
